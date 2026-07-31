@@ -65,9 +65,9 @@ NOTES FOR REVIEW
   Apart from relative API paths, the package contains no hardcoded address.
 - There is no persistent content script. The harvesting script is injected via
   activeTab at the moment of a user action only.
-- Source code: <REPOSITORY-URL EINTRAGEN>
+- Source code: https://github.com/bedeberger/schreibwerkstatt-browser-extension
 
-Contact for questions during review: <DEINE E-MAIL>
+Contact for questions during review: david.berger@dotag.ch
 ```
 
 ---
@@ -118,21 +118,23 @@ NOTES FOR REVIEW
   verifiable by grepping the package for "http".
 - There is no persistent content script. The harvesting script is injected via
   activeTab at the moment of a user action only.
-- Source code: <REPOSITORY-URL EINTRAGEN>
+- Source code: https://github.com/bedeberger/schreibwerkstatt-browser-extension
 
 I am glad to answer any question that would help the review.
-Contact: <DEINE E-MAIL>
+Contact: david.berger@dotag.ch
 ```
 
 ---
 
 ## Vor dem Absenden ersetzen
 
-- `<TEST-INSTANZ-URL EINTRAGEN>`
-- `<TEST-TOKEN EINTRAGEN>`
-- `<REPOSITORY-URL EINTRAGEN>` — oder die Zeile streichen
-- `<DEINE E-MAIL>`
+Repository-URL und Kontaktadresse sind schon eingesetzt. Offen ist nur, wenn du
+Variante A nimmst:
+
+- `<TEST-INSTANZ-URL EINTRAGEN, z. B. https://demo.example.org>`
+- `<TEST-TOKEN EINTRAGEN, beginnt mit swd_>`
 
 Und daran denken: das Testtoken darf während der Prüfung nicht ablaufen. Läuft es
 mitten in der Prüfung aus, sieht der Prüfer eine Erweiterung, die sich nicht
-verbinden kann.
+verbinden kann — und die Prüfung kann Wochen dauern. Gib dem Token also
+reichlich Laufzeit oder gar keine.

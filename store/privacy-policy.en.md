@@ -1,11 +1,14 @@
 # Privacy Policy — Schreibwerkstatt – Capture (Chrome extension)
 
 **Last updated:** 31 July 2026
-**Controller:** `<YOUR NAME AND CONTACT EMAIL>`
+**Controller:** `<CONTROLLER>`, david.berger@dotag.ch
 
 > English version of [privacy-policy.de.md](privacy-policy.de.md). Publishing one
 > of the two is enough for the Chrome Web Store; publishing both is better,
-> since the extension ships both locales. Replace the placeholders first.
+> since the extension ships both locales.
+>
+> Nur `<CONTROLLER>` ist offen — gleiche Entscheidung wie in der deutschen
+> Fassung, beide müssen dasselbe sagen.
 
 ---
 
@@ -135,4 +138,4 @@ of the extension.
 
 ## 11. Contact
 
-`<CONTACT EMAIL>`
+`david.berger@dotag.ch`

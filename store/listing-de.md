@@ -73,12 +73,11 @@ Deinstallieren löscht alles Lokale restlos.
 
 MIT-Lizenz. Der ausgelieferte Code ist nicht minifiziert und nicht obfuskiert; du kannst das Paket entpacken und Zeile für Zeile mit dem Repository vergleichen.
 
-Quellcode: <REPOSITORY-URL EINTRAGEN>
+Quellcode: https://github.com/bedeberger/schreibwerkstatt-browser-extension
 ```
 
-> ⚠️ Vor dem Absenden `<REPOSITORY-URL EINTRAGEN>` ersetzen. Steht der Code
-> nirgends öffentlich, den Absatz „OFFENER QUELLCODE" bis auf den ersten Satz
-> streichen — eine Behauptung, die niemand nachprüfen kann, nützt nichts.
+> Die Repository-URL ist eingesetzt und das Repository ist öffentlich, der
+> Absatz ist also nachprüfbar — genau darum steht er drin.
 
 ### Kategorie
 
@@ -226,14 +225,20 @@ Alle drei bestätigen — alle drei sind hier wahr:
 ### URL der Datenschutzerklärung
 
 ```
-<URL DER GEHOSTETEN DATENSCHUTZERKLÄRUNG EINTRAGEN>
+https://github.com/bedeberger/schreibwerkstatt-browser-extension/blob/main/store/privacy-policy.de.md
 ```
 
 > Pflichtfeld, sobald Nutzerdaten verarbeitet werden — hier also unvermeidbar.
-> Der Text liegt fertig in [privacy-policy.de.md](privacy-policy.de.md) und
-> [privacy-policy.en.md](privacy-policy.en.md); er muss unter einer öffentlich
-> erreichbaren, dauerhaften URL stehen. Wege dorthin:
+> Die URL oben funktioniert, sobald der Stand gepusht ist: das Repository ist
+> öffentlich, GitHub rendert die Datei, und der Link bleibt stabil. Voraussetzung
+> ist nur, dass in [privacy-policy.de.md](privacy-policy.de.md) der
+> Verantwortliche eingetragen ist.
+>
+> Hübscher wäre eine eigene Seite auf deiner Schreibwerkstatt-Domain oder GitHub
+> Pages — beides optional, siehe
 > [PUBLISHING.md](PUBLISHING.md#3-datenschutzerklärung-veröffentlichen).
+> **Vor dem Einreichen die URL einmal im Browser aufrufen.** Ist sie nicht
+> erreichbar, ist das ein Ablehnungsgrund.
 
 ---
 

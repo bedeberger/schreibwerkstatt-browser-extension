@@ -180,30 +180,39 @@ Prüfung aber langsamer; Obfuskieren ist verboten. So bleibt es, wie es ist.
 
 Pflichtfeld, weil die Erweiterung Nutzerdaten verarbeitet. Der Text liegt fertig
 in [privacy-policy.de.md](privacy-policy.de.md) und
-[privacy-policy.en.md](privacy-policy.en.md). Zwei Platzhalter ersetzen —
-Verantwortlicher und Kontakt-E-Mail — und dann unter einer **öffentlich
-erreichbaren, dauerhaften** URL ablegen.
+[privacy-policy.en.md](privacy-policy.en.md). **Ein** Platzhalter ist noch offen
+— `<VERANTWORTLICHER>`; die Kontaktadresse ist eingesetzt. Dann muss der Text
+unter einer **öffentlich erreichbaren, dauerhaften** URL stehen.
 
-Möglichkeiten, in absteigender Eignung:
+Weil das Repository öffentlich ist, ist der kürzeste Weg schon gangbar:
+
+```
+https://github.com/bedeberger/schreibwerkstatt-browser-extension/blob/main/store/privacy-policy.de.md
+```
+
+Kein Setup, GitHub rendert das Markdown, der Link bleibt stabil, solange die
+Datei auf `main` liegt. Das genügt dem Store — ein bestimmtes Format verlangt er
+nicht. Nur pushen musst du vorher.
+
+Schöner wird es so, falls dich die GitHub-Oberfläche um das Dokument herum
+stört:
 
 1. **Eine Seite auf deiner Schreibwerkstatt-Domain**, z. B.
    `https://schreibwerkstatt.example.org/extension-privacy`. Am stimmigsten:
-   dieselbe Domain, die auch im Eintrag als Server-Beispiel auftaucht.
-2. **GitHub Pages oder eine gerenderte Datei im Repository.** Wenn du den Code
-   veröffentlichst, ohnehin naheliegend. Eine Markdown-Datei in einem
-   öffentlichen Repo genügt; der Store verlangt kein bestimmtes Format.
-3. **Ein öffentlicher Gist.** Geht, wirkt aber beiläufig für ein Pflichtdokument.
+   dieselbe Domain, die im Eintrag als Server-Beispiel auftaucht.
+2. **GitHub Pages** für dieses Repo einschalten (Settings → Pages, Quelle
+   `main`). Die Datei liegt dann als eigene Seite unter
+   `bedeberger.github.io/schreibwerkstatt-browser-extension/store/privacy-policy.de`
+   — sauberer, aber ein Schritt mehr.
 
-Nicht geeignet: alles, was einen Login braucht, ablaufen kann oder nur über
-einen Kurzlink erreichbar ist. Die Prüfung ruft die URL auf; ist sie nicht
-erreichbar, ist das ein Ablehnungsgrund.
+Nicht geeignet: alles, was einen Login braucht, ablaufen kann oder nur über einen
+Kurzlink erreichbar ist. Auch **nicht** die `raw.githubusercontent.com`-Variante:
+die liefert `text/plain` und liest sich für einen Prüfer nicht wie ein
+veröffentlichtes Dokument.
 
-> Weg 2 steht offen: das Repository liegt öffentlich unter
-> <https://github.com/bedeberger/schreibwerkstatt-browser-extension>. Die
-> gerenderte Datei ist damit unter
-> `https://github.com/bedeberger/schreibwerkstatt-browser-extension/blob/main/store/privacy-policy.de.md`
-> erreichbar — bevor du sie als Datenschutz-URL einträgst, ruf sie einmal in
-> einem abgemeldeten Browserfenster auf.
+> Welche URL du auch nimmst: ruf sie vor dem Einreichen einmal in einem
+> **abgemeldeten** Browserfenster auf. Die Prüfung ruft sie auf, und eine nicht
+> erreichbare Datenschutz-URL ist ein Ablehnungsgrund.
 
 ---
 
@@ -404,13 +413,15 @@ Vor dem Einreichen:
 
 - [ ] Entwicklerkonto angelegt, 5 USD bezahlt, E-Mail bestätigt, 2FA aktiv
 - [ ] entschieden, welche E-Mail-Adresse das Konto führt (nicht änderbar)
-- [ ] Publisher-Name gewählt (nicht änderbar)
+- [ ] Publisher-Name gewählt (nicht änderbar) — gleiche Entscheidung wie
+      `<VERANTWORTLICHER>` in der Datenschutzerklärung, beides sollte
+      übereinstimmen
 - [ ] `npm test` läuft durch
 - [ ] `npm run package` erzeugt das ZIP, SHA-256 notiert
-- [ ] Datenschutzerklärung: Platzhalter ersetzt, öffentlich erreichbar,
-      URL im Browser geprüft
-- [ ] Repository-URL in [listing-de.md](listing-de.md) und
-      [listing-en.md](listing-en.md) eingesetzt — oder der Absatz gestrichen
+- [ ] `<VERANTWORTLICHER>` in beiden Datenschutzerklärungen eingetragen —
+      Privatperson oder dot AG, in beiden Fassungen gleich
+- [ ] Stand nach `main` gepusht, damit die Datenschutz-URL trägt
+- [ ] Datenschutz-URL in einem abgemeldeten Browserfenster aufgerufen
 - [ ] Testanleitung ausgefüllt, Variante A oder B; Testtoken läuft nicht ab
 - [ ] `npm run promo` gelaufen, beide Kacheln vorhanden
 - [ ] mindestens ein Screenshot in genau 1280 × 800, mit `file` geprüft

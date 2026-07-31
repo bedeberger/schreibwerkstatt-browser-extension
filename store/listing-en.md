@@ -70,11 +70,10 @@ Uninstalling erases everything stored locally.
 
 MIT licensed. The shipped code is neither minified nor obfuscated; you can unpack the package and compare it line by line with the repository.
 
-Source: <REPOSITORY URL>
+Source: https://github.com/bedeberger/schreibwerkstatt-browser-extension
 ```
 
-> ⚠️ Replace `<REPOSITORY URL>` before submitting, or cut the "OPEN SOURCE"
-> paragraph down to its first sentence if the code is not published anywhere.
+> Repository-URL ist eingesetzt, das Repository ist öffentlich.
 
 ## Category
 

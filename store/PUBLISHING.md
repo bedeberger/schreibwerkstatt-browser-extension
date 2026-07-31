@@ -40,15 +40,30 @@ Ohne Schreibwerkstatt-Server und Gerätetoken tut die Erweiterung nichts. Wer da
 Popup öffnet, sieht „Nicht verbunden" — und eine Erweiterung, die nicht tut, was
 ihre Beschreibung ankündigt, wird abgelehnt.
 
-**Das ist das größte Risiko dieser Einreichung, und es ist auflösbar:** stell für
-die Dauer der Prüfung eine erreichbare Instanz und ein Token bereit und schreib
-beides in die Testanleitung. Am besten eine Demo-Instanz mit Wegwerf-Inhalten,
-nicht dein Produktivsystem — der Prüfer wird darin Testeinträge anlegen.
+**Das ist das größte Risiko dieser Einreichung, und es ist auflösbar** — ohne
+dass du dafür eine Demo-Instanz der Schreibwerkstatt aufsetzen müsstest:
 
-Geht das nicht, nimm Variante B aus [test-instructions.md](test-instructions.md).
-Die sagt offen, dass keine Instanz bereitsteht, und listet auf, was sich ohne
-Server trotzdem prüfen lässt (die gesamte Erntestrecke funktioniert nämlich
-serverlos). Das ist erkennbar schlechter, aber besser als ein leeres Feld.
+```bash
+REVIEW_TOKEN=swd_pruefung_$(openssl rand -hex 12) PORT=8787 npm run review-server
+```
+
+[tools/review-server.mjs](../tools/review-server.mjs) bietet denselben
+API-Vertrag an, gegen den auch `test/integration.test.js` prüft — mit
+Beispieldaten, im Arbeitsspeicher, ohne Zugriff auf irgendetwas Echtes. Der
+Prüfer bekommt drei Bücher, kann erfassen, zitieren, nachschlagen und sogar den
+Fehlerpfad sehen. Danach: Prozess beenden. Nichts wegzuräumen, kein Token zu
+widerrufen.
+
+Nötig ist nur, dass er über **HTTPS** erreichbar ist und bis zum Abschluss der
+Prüfung läuft — ein Server-Block hinter deinem bestehenden Reverse-Proxy, kein
+neues Hosting.
+
+**Nimm dafür nicht die Produktion.** `GET /content/books` gibt die Titel aller
+deiner Buchprojekte und die `owner_email` der Eigentümer heraus — bei gemeinsam
+bearbeiteten Büchern also E-Mail-Adressen anderer Leute. Dazu kennt der
+API-Vertrag kein `DELETE /research/:id`, die Testeinträge des Prüfers bleiben
+also stehen. Alle drei Wege samt Formulartexten stehen in
+[test-instructions.md](test-instructions.md).
 
 ### Das weite Host-Muster fällt auf
 
@@ -122,16 +137,21 @@ Erweiterung.
    veröffentlichen.
 5. Bestätigung in zwei Schritten ist für das Konto Pflicht.
 
-**Zwei Dinge, die sich später nicht mehr ändern lassen:**
+**Zwei Dinge, die sich später nicht mehr ändern lassen — beide sind entschieden:**
 
-- **Die E-Mail-Adresse des Kontos.** Willst du sie wechseln, brauchst du ein
-  neues Konto und musst die Erweiterungen per Support-Formular übertragen. Die
-  Adresse eines gelöschten Kontos ist danach dauerhaft verbrannt und nicht
-  wiederverwendbar. Überleg dir also jetzt, ob `david.berger@dotag.ch` die
-  richtige ist oder ob eine eigene Adresse fürs Veröffentlichen besser passt.
-- **Der Publisher-Name.** Steht unter dem Titel jeder deiner Erweiterungen. Für
-  ein Projekt wie dieses ist ein Klarname oder ein Projektname beides
-  vertretbar.
+- **Die E-Mail-Adresse des Kontos:** `bede.berger@gmail.com`. Dieselbe Adresse
+  steht als Verantwortlicher in der Datenschutzerklärung, und sie ist bereits
+  ein Google-Konto — das Entwicklerkonto braucht eines. Nicht die
+  Firmenadresse: Verantwortlicher ist David Berger persönlich, und Store-Konto
+  und Datenschutzerklärung sollten dieselbe Person nennen.
+
+  Der Wechsel wäre teuer: du brauchst dafür ein neues Konto und musst die
+  Erweiterungen per Support-Formular übertragen. Die Adresse eines gelöschten
+  Kontos ist danach dauerhaft verbrannt und nicht wiederverwendbar.
+- **Der Publisher-Name:** `David Berger`. Steht unter dem Titel jeder deiner
+  Erweiterungen und deckt sich so mit dem Verantwortlichen in der
+  Datenschutzerklärung. Ein Prüfer, der beides vergleicht, findet dasselbe —
+  genau das ist der Zweck.
 
 ---
 
@@ -178,11 +198,11 @@ Prüfung aber langsamer; Obfuskieren ist verboten. So bleibt es, wie es ist.
 
 ## 3. Datenschutzerklärung veröffentlichen
 
-Pflichtfeld, weil die Erweiterung Nutzerdaten verarbeitet. Der Text liegt fertig
-in [privacy-policy.de.md](privacy-policy.de.md) und
-[privacy-policy.en.md](privacy-policy.en.md). **Ein** Platzhalter ist noch offen
-— `<VERANTWORTLICHER>`; die Kontaktadresse ist eingesetzt. Dann muss der Text
-unter einer **öffentlich erreichbaren, dauerhaften** URL stehen.
+Pflichtfeld, weil die Erweiterung Nutzerdaten verarbeitet. Der Text steht
+vollständig in [privacy-policy.de.md](privacy-policy.de.md) und
+[privacy-policy.en.md](privacy-policy.en.md) — Verantwortlicher und
+Kontaktadresse sind eingetragen, nichts mehr auszufüllen. Er muss nur noch unter
+einer **öffentlich erreichbaren, dauerhaften** URL stehen.
 
 Weil das Repository öffentlich ist, ist der kürzeste Weg schon gangbar:
 
@@ -340,8 +360,9 @@ auslassen — eine leere Zeile ist ein Ablehnungsgrund.
 
 **Vertrieb** — nicht aufgeführt, kostenlos, alle Regionen.
 
-**Testanleitung** — aus [test-instructions.md](test-instructions.md), Variante A
-oder B. Nicht leer lassen.
+**Testanleitung** — aus [test-instructions.md](test-instructions.md),
+Variante A. Nicht leer lassen, und vorher den Referenz-Server starten: die
+Adresse im Formular muss in dem Moment funktionieren, in dem du einreichst.
 
 Dann **Zur Prüfung einreichen**. Zur Wahl steht außerdem, nach der Freigabe
 nicht automatisch, sondern von Hand zu veröffentlichen — das Zeitfenster dafür
@@ -411,18 +432,17 @@ Datennutzungs-Angaben im selben Zug angepasst.
 
 Vor dem Einreichen:
 
-- [ ] Entwicklerkonto angelegt, 5 USD bezahlt, E-Mail bestätigt, 2FA aktiv
-- [ ] entschieden, welche E-Mail-Adresse das Konto führt (nicht änderbar)
-- [ ] Publisher-Name gewählt (nicht änderbar) — gleiche Entscheidung wie
-      `<VERANTWORTLICHER>` in der Datenschutzerklärung, beides sollte
-      übereinstimmen
+- [ ] Entwicklerkonto auf `bede.berger@gmail.com` angelegt, 5 USD bezahlt,
+      E-Mail bestätigt, 2FA aktiv
+- [ ] Publisher-Name `David Berger` gesetzt (nicht änderbar)
 - [ ] `npm test` läuft durch
 - [ ] `npm run package` erzeugt das ZIP, SHA-256 notiert
-- [ ] `<VERANTWORTLICHER>` in beiden Datenschutzerklärungen eingetragen —
-      Privatperson oder dot AG, in beiden Fassungen gleich
-- [ ] Stand nach `main` gepusht, damit die Datenschutz-URL trägt
+- [ ] Stand nach `main` gepusht, damit die Datenschutz-URL den fertigen Text zeigt
 - [ ] Datenschutz-URL in einem abgemeldeten Browserfenster aufgerufen
-- [ ] Testanleitung ausgefüllt, Variante A oder B; Testtoken läuft nicht ab
+- [ ] Referenz-Server läuft über HTTPS und übersteht einen Neustart
+      (systemd o. ä., nicht in einem offenen Terminal)
+- [ ] Testanleitung ausgefüllt: Adresse und `REVIEW_TOKEN` eingesetzt,
+      Einrichtung einmal selbst durchgeklickt wie ein Prüfer
 - [ ] `npm run promo` gelaufen, beide Kacheln vorhanden
 - [ ] mindestens ein Screenshot in genau 1280 × 800, mit `file` geprüft
 - [ ] Begründung für jede der sechs Berechtigungen **und** für die

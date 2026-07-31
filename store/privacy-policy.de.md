@@ -1,17 +1,14 @@
 # Datenschutzerklärung — Schreibwerkstatt – Erfassen (Chrome-Erweiterung)
 
 **Stand:** 31. Juli 2026
-**Verantwortlich:** `<VERANTWORTLICHER>`, david.berger@dotag.ch
+**Verantwortlich:** David Berger, bede.berger@gmail.com
 
 > Diese Datei ist der Text, der unter der im Chrome Web Store angegebenen URL
-> erreichbar sein muss. Sobald sie gepusht ist, erfüllt schon
+> erreichbar sein muss. Sobald der aktuelle Stand auf `main` liegt, erfüllt
 > <https://github.com/bedeberger/schreibwerkstatt-browser-extension/blob/main/store/privacy-policy.de.md>
 > diese Anforderung — weitere Wege in
 > [PUBLISHING.md](PUBLISHING.md#3-datenschutzerklärung-veröffentlichen).
->
-> **Offen ist nur `<VERANTWORTLICHER>`:** trittst du als Privatperson auf oder
-> als dot AG? Davon hängt auch der Publisher-Name im Store ab, und beides sollte
-> übereinstimmen. Eintragen und diesen Kasten löschen.
+> Der Text ist vollständig; nichts mehr einzutragen.
 
 ---
 
@@ -151,4 +148,4 @@ Version der Erweiterung durch die Prüfung des Chrome Web Store.
 
 ## 11. Kontakt
 
-`david.berger@dotag.ch`
+`bede.berger@gmail.com`

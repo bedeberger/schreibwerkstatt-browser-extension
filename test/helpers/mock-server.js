@@ -16,6 +16,9 @@ import { createServer } from 'node:http';
  * @property {string} [token] gueltiges Token
  * @property {boolean} [tokenHasCaptureScope]
  * @property {Set<string>} [takenCitekeys]
+ * @property {number} [port] Port; 0 waehlt einen freien (Voreinstellung)
+ * @property {string} [host] Bind-Adresse; nur Loopback als Voreinstellung
+ * @property {(entry: any) => void} [onRequest] wird je Anfrage aufgerufen
  */
 
 /**
@@ -28,6 +31,11 @@ export async function startMockServer(options = {}) {
     token: 'swd_gueltig',
     tokenHasCaptureScope: true,
     takenCitekeys: new Set(['muster2019']),
+    // Fuer die Tests: freier Port, nur Loopback. `tools/review-server.mjs`
+    // ueberschreibt beides, um denselben Vertrag oeffentlich anzubieten.
+    port: 0,
+    host: '127.0.0.1',
+    onRequest: undefined,
     ...options,
   };
 
@@ -89,6 +97,7 @@ export async function startMockServer(options = {}) {
       body: parseJson(rawBody, req.headers['content-type']),
       rawLength: rawBody.length,
     });
+    config.onRequest?.(log[log.length - 1]);
 
     // ---------------------------------------------------------- Kopfzeilen
     const auth = req.headers.authorization || '';
@@ -259,11 +268,12 @@ export async function startMockServer(options = {}) {
     return sendNotARoute(res);
   }
 
-  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  await new Promise((resolve) => server.listen(config.port, config.host, resolve));
   const { port } = /** @type {any} */ (server.address());
 
   return {
-    url: `http://127.0.0.1:${port}`,
+    url: `http://${config.host === '0.0.0.0' ? '127.0.0.1' : config.host}:${port}`,
+    port,
     config,
     state,
     log,

@@ -256,6 +256,7 @@ npm test           # 224 Tests, kein Server nötig
 npm run icons      # Symbole aus tools/make-icons.mjs neu erzeugen
 npm run package    # store-fertiges ZIP unter store/ erzeugen
 npm run promo      # Werbekacheln für den Store rendern (braucht Chrome)
+npm run review-server   # Referenz-Server für die Store-Prüfung (REVIEW_TOKEN setzen)
 npm run clean      # dist/ löschen
 ```
 
@@ -447,8 +448,13 @@ diese Erweiterung und sollten vor dem Einreichen gelesen sein:
 
 1. **Ohne Server und Token tut die Erweiterung nichts.** Ein Prüfer, der das
    nicht überbrücken kann, hat keinen Grund anzunehmen, dass sie funktioniert.
-   Die Testanleitung ist deshalb der wichtigste Text der Einreichung — siehe
-   [store/test-instructions.md](store/test-instructions.md).
+   Dafür gibt es `npm run review-server`
+   ([tools/review-server.mjs](tools/review-server.mjs)): derselbe API-Vertrag,
+   gegen den `test/integration.test.js` prüft, mit Beispieldaten im
+   Arbeitsspeicher, öffentlich anzubieten für die Dauer der Prüfung. **Nicht die
+   Produktion hernehmen** — `GET /content/books` gibt die Titel aller
+   Buchprojekte und die `owner_email` ihrer Eigentümer heraus. Die drei Wege
+   samt Formulartexten: [store/test-instructions.md](store/test-instructions.md).
 2. **`https://*/*` unter `optional_host_permissions` verlängert die Prüfung.**
    Unvermeidbar bei einer selbst gehosteten App, aber die Begründung muss
    vollständig ins Formular — sie steht ausformuliert in

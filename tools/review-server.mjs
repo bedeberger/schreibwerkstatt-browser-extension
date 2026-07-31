@@ -1,0 +1,103 @@
+/**
+ * Referenz-Server fuer die Chrome-Web-Store-Pruefung.
+ *
+ *   REVIEW_TOKEN=swd_… node tools/review-server.mjs
+ *
+ * Warum es das gibt: die Erweiterung ist ohne Schreibwerkstatt-Server
+ * funktionslos, und eine Erweiterung, die sich nicht bedienen laesst, wird
+ * abgelehnt. Der Pruefer braucht also eine erreichbare Gegenstelle — aber
+ * ausgerechnet die Produktion ist dafuer die schlechteste Wahl:
+ * `GET /content/books` gibt alle Buchtitel **und** die `owner_email` der
+ * Mitarbeitenden heraus, und der API-Vertrag kennt kein `DELETE /research/:id`,
+ * die Testeintraege des Pruefers muesste man also von Hand wegraeumen.
+ *
+ * Deshalb wird hier derselbe Vertrag angeboten, gegen den auch
+ * `test/integration.test.js` prueft — mit Beispieldaten statt echter.
+ * Kein Zugriff auf irgendetwas Echtes, nichts wegzuraeumen, nichts zu
+ * widerrufen: Prozess beenden und die Sache ist erledigt.
+ *
+ * Der Zustand liegt ausschliesslich im Arbeitsspeicher. Ein Neustart setzt
+ * alles zurueck; es wird nichts auf Platte geschrieben.
+ *
+ * Umgebungsvariablen:
+ *   REVIEW_TOKEN  Pflicht. Das Token, das der Pruefer eintraegt. Muss mit
+ *                 `swd_` beginnen, sonst weist die Options-Seite es ab.
+ *   PORT          Voreinstellung 8787
+ *   HOST          Voreinstellung 0.0.0.0
+ *
+ * Der Pruefer braucht **HTTPS**: die Options-Seite warnt bei einer
+ * nicht-lokalen `http`-Adresse, und eine Warnung im Einrichtungsdialog ist das
+ * Letzte, was er sehen soll. Also hinter einen Reverse-Proxy mit Zertifikat.
+ */
+
+import { startMockServer } from '../test/helpers/mock-server.js';
+
+const token = process.env.REVIEW_TOKEN;
+const port = Number(process.env.PORT || 8787);
+const host = process.env.HOST || '0.0.0.0';
+
+if (!token) {
+  process.stderr.write([
+    '',
+    'FEHLER: REVIEW_TOKEN fehlt.',
+    '',
+    'Ohne Token wuerde dieser Server jede Anfrage annehmen. Setz eines:',
+    '',
+    '  REVIEW_TOKEN=swd_pruefung_$(openssl rand -hex 12) node tools/review-server.mjs',
+    '',
+  ].join('\n'));
+  process.exit(1);
+}
+
+if (!token.startsWith('swd_')) {
+  process.stderr.write('\nFEHLER: REVIEW_TOKEN muss mit "swd_" beginnen — die Options-Seite weist alles andere ab.\n\n');
+  process.exit(1);
+}
+
+/** @param {any} entry */
+function logRequest(entry) {
+  const stamp = new Date().toISOString().slice(11, 19);
+  const size = entry.rawLength ? ` ${entry.rawLength} B` : '';
+  process.stdout.write(`  ${stamp}  ${entry.route}${size}\n`);
+}
+
+const server = await startMockServer({
+  token,
+  port,
+  host,
+  // Beide Endpunkte anbieten, damit der Pruefer den vollen Funktionsumfang
+  // sieht und nicht die Degradationspfade fuer aeltere Server.
+  hasCapture: true,
+  hasByUrl: true,
+  onRequest: logRequest,
+});
+
+process.stdout.write([
+  '',
+  'Referenz-Server fuer die Store-Pruefung laeuft.',
+  '',
+  `  Adresse (lokal):  http://${host === '0.0.0.0' ? '127.0.0.1' : host}:${server.port}`,
+  `  Token:            ${token}`,
+  '',
+  'Beides gehoert in das Feld „Testanleitung" im Developer-Dashboard —',
+  'die Adresse aber als oeffentliche https-URL, nicht als die hier gezeigte.',
+  'Vorlage: store/test-instructions.md',
+  '',
+  'Angebotene Buecher: Nordlicht (owner) · Mitschrift (editor) ·',
+  'Fremdes Buch (viewer — liefert absichtlich BOOK_ACCESS_DENIED, damit die',
+  'Fehlerbehandlung sichtbar ist).',
+  '',
+  'Jede Anfrage wird unten protokolliert. Daran siehst du auch, ob der Pruefer',
+  'die Erweiterung wirklich ausprobiert hat.',
+  '',
+  'Beenden mit Strg+C. Der Zustand ist nur im Arbeitsspeicher und dann weg.',
+  '',
+].join('\n'));
+
+for (const signal of ['SIGINT', 'SIGTERM']) {
+  process.on(signal, async () => {
+    await server.close();
+    process.stdout.write('\nBeendet.\n');
+    process.exit(0);
+  });
+}

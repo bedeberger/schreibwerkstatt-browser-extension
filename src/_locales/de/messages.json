@@ -1,0 +1,635 @@
+{
+  "lang_code": {
+    "message": "de"
+  },
+  "ext_name": {
+    "message": "Schreibwerkstatt – Erfassen"
+  },
+  "ext_description": {
+    "message": "Webseiten als Recherche-Fundstück oder zitierfähige Quelle in deine Schreibwerkstatt schicken."
+  },
+  "action_title": {
+    "message": "Seite in die Schreibwerkstatt erfassen"
+  },
+  "command_open_popup": {
+    "message": "Erfassungs-Popup öffnen"
+  },
+  "command_capture_quote": {
+    "message": "Markierung als Zitat erfassen"
+  },
+  "context_menu_capture_quote": {
+    "message": "Als Zitat erfassen"
+  },
+  "badge_token_problem": {
+    "message": "Token-Problem – Einstellungen öffnen"
+  },
+  "badge_pending": {
+    "message": "$1 Eintrag/Einträge warten auf Versand"
+  },
+  "badge_failed": {
+    "message": "$1 Eintrag/Einträge sind gescheitert"
+  },
+  "notify_saved_title": {
+    "message": "Gesichert"
+  },
+  "notify_saved_research": {
+    "message": "Als Recherche-Fundstück in „$1“ abgelegt."
+  },
+  "notify_saved_source": {
+    "message": "Als Quelle in deiner Bibliothek abgelegt."
+  },
+  "notify_saved_both": {
+    "message": "Als Fundstück und als Quelle in „$1“ abgelegt."
+  },
+  "notify_failed_title": {
+    "message": "Nicht gesichert"
+  },
+  "notify_quote_captured_title": {
+    "message": "Zitat erfasst"
+  },
+  "notify_quote_captured_message": {
+    "message": "Geht in $2 Sekunden an „$1“."
+  },
+  "notify_undo_button": {
+    "message": "Rückgängig"
+  },
+  "notify_undone_title": {
+    "message": "Zurückgezogen"
+  },
+  "notify_undone_message": {
+    "message": "Das Zitat wurde nicht gesendet."
+  },
+  "notify_undo_too_late_title": {
+    "message": "Zu spät"
+  },
+  "notify_undo_too_late_message": {
+    "message": "Das Zitat ist bereits unterwegs."
+  },
+  "notify_setup_needed_title": {
+    "message": "Noch nicht eingerichtet"
+  },
+  "notify_setup_needed_message": {
+    "message": "Trage zuerst Server-Adresse und Token ein."
+  },
+  "notify_no_book_title": {
+    "message": "Kein Standardbuch"
+  },
+  "notify_no_book_message": {
+    "message": "Wähle in den Einstellungen ein Standardbuch für Zitate."
+  },
+  "notify_no_selection_title": {
+    "message": "Keine Markierung"
+  },
+  "notify_no_selection_message": {
+    "message": "Markiere zuerst den Text, den du zitieren willst."
+  },
+  "notify_quote_too_long_title": {
+    "message": "Zitat zu lang"
+  },
+  "notify_quote_too_long_message": {
+    "message": "Erlaubt sind $1 Zeichen, markiert waren $2."
+  },
+  "err_not_logged_in": {
+    "message": "Das Geräte-Token gilt nicht mehr. Erzeuge in der Web-App ein neues."
+  },
+  "err_capture_scope_required": {
+    "message": "Dieses Token darf nicht erfassen. Erzeuge in der Web-App ein Token mit Erfassungs-Berechtigung."
+  },
+  "err_source_identity_req": {
+    "message": "Eine Quelle braucht mindestens einen Titel oder eine Person."
+  },
+  "err_citekey_taken": {
+    "message": "Dieser Zitierschlüssel ist schon vergeben."
+  },
+  "err_book_not_found": {
+    "message": "Dieses Buch gibt es nicht (mehr)."
+  },
+  "err_book_access_denied": {
+    "message": "In dieses Buch darfst du nicht schreiben."
+  },
+  "err_forbidden": {
+    "message": "Der Server hat den Zugriff verweigert."
+  },
+  "err_validation_failed": {
+    "message": "Der Server hat die Angaben abgelehnt."
+  },
+  "err_payload_too_large": {
+    "message": "Die Daten sind zu groß für den Server."
+  },
+  "err_unsupported_media_type": {
+    "message": "Dieses Dateiformat nimmt der Server nicht an."
+  },
+  "err_rate_limited": {
+    "message": "Zu viele Anfragen. Es wird später erneut versucht."
+  },
+  "err_not_found": {
+    "message": "Nicht gefunden."
+  },
+  "err_server_error": {
+    "message": "Der Server hat einen Fehler gemeldet. Es wird später erneut versucht."
+  },
+  "err_network": {
+    "message": "Keine Verbindung zum Server. Der Eintrag wartet in der Warteschlange."
+  },
+  "err_status_400": {
+    "message": "Die Anfrage war fehlerhaft."
+  },
+  "err_status_403": {
+    "message": "Nicht erlaubt."
+  },
+  "err_status_404": {
+    "message": "Diesen Endpunkt gibt es auf deinem Server nicht."
+  },
+  "err_status_409": {
+    "message": "Konflikt mit einem vorhandenen Eintrag."
+  },
+  "err_status_timeout": {
+    "message": "Der Server hat nicht rechtzeitig geantwortet."
+  },
+  "err_unknown": {
+    "message": "Unbekannter Fehler."
+  },
+  "validation_book_required": {
+    "message": "Bitte ein Buch wählen."
+  },
+  "validation_kind_invalid": {
+    "message": "Ungültige Art des Fundstücks."
+  },
+  "validation_title_too_long": {
+    "message": "Der Titel darf höchstens $1 Zeichen haben, aktuell sind es $2."
+  },
+  "validation_body_too_long": {
+    "message": "Der Text darf höchstens $1 Zeichen haben, aktuell sind es $2."
+  },
+  "validation_research_empty": {
+    "message": "Titel, Text oder URL – mindestens eines muss ausgefüllt sein."
+  },
+  "validation_csl_type_invalid": {
+    "message": "Bitte einen gültigen Quellentyp wählen."
+  },
+  "validation_source_identity": {
+    "message": "Eine Quelle braucht mindestens einen Titel oder eine Person."
+  },
+  "validation_url_scheme": {
+    "message": "Die URL muss mit http:// oder https:// beginnen."
+  },
+  "validation_year_invalid": {
+    "message": "Bitte eine vierstellige Jahreszahl eingeben."
+  },
+  "validation_image_too_large": {
+    "message": "Das Bild darf höchstens $1 MB haben, es sind $2 MB."
+  },
+  "validation_doc_too_large": {
+    "message": "Das PDF darf höchstens $1 MB haben, es sind $2 MB."
+  },
+  "mode_research": {
+    "message": "Recherche"
+  },
+  "mode_source": {
+    "message": "Quelle"
+  },
+  "mode_both": {
+    "message": "Beides"
+  },
+  "kind_note": {
+    "message": "Notiz"
+  },
+  "kind_link": {
+    "message": "Link"
+  },
+  "kind_quote": {
+    "message": "Zitat"
+  },
+  "kind_fact": {
+    "message": "Fakt"
+  },
+  "role_owner": {
+    "message": "Eigentümer:in"
+  },
+  "role_editor": {
+    "message": "Bearbeiter:in"
+  },
+  "role_viewer": {
+    "message": "nur Leserecht"
+  },
+  "csl_book": {
+    "message": "Buch"
+  },
+  "csl_chapter": {
+    "message": "Buchkapitel"
+  },
+  "csl_article": {
+    "message": "Zeitschriftenartikel"
+  },
+  "csl_website": {
+    "message": "Webseite"
+  },
+  "csl_thesis": {
+    "message": "Qualifikationsschrift"
+  },
+  "csl_report": {
+    "message": "Bericht"
+  },
+  "csl_legal": {
+    "message": "Rechtsquelle"
+  },
+  "csl_interview": {
+    "message": "Interview"
+  },
+  "csl_film": {
+    "message": "Film"
+  },
+  "csl_dataset": {
+    "message": "Datensatz"
+  },
+  "csl_other": {
+    "message": "Sonstiges"
+  },
+  "popup_document_title": {
+    "message": "Erfassen"
+  },
+  "popup_heading": {
+    "message": "Erfassen"
+  },
+  "popup_open_options": {
+    "message": "Einstellungen"
+  },
+  "popup_setup_needed": {
+    "message": "Bitte zuerst Server-Adresse und Token in den Einstellungen hinterlegen."
+  },
+  "popup_goto_options": {
+    "message": "Einstellungen öffnen"
+  },
+  "popup_harvesting": {
+    "message": "Seite wird ausgewertet …"
+  },
+  "popup_target": {
+    "message": "Ziel"
+  },
+  "popup_book": {
+    "message": "Buch"
+  },
+  "popup_no_books": {
+    "message": "Keine Bücher geladen"
+  },
+  "popup_book_viewer_hint": {
+    "message": "Bücher, in denen du nur Leserecht hast, sind ausgegraut."
+  },
+  "popup_kind": {
+    "message": "Art"
+  },
+  "popup_tags": {
+    "message": "Schlagwörter"
+  },
+  "popup_tags_placeholder": {
+    "message": "durch Komma getrennt"
+  },
+  "popup_title": {
+    "message": "Titel"
+  },
+  "popup_body": {
+    "message": "Text"
+  },
+  "popup_verbatim_hint": {
+    "message": "Markierter Wortlaut – unverändert übernommen."
+  },
+  "popup_truncated_hint": {
+    "message": "Auf $1 Zeichen gekürzt (Original: $2). An einer Satzgrenze getrennt."
+  },
+  "popup_source_details": {
+    "message": "Angaben zur Quelle"
+  },
+  "popup_csl_type": {
+    "message": "Typ"
+  },
+  "popup_year": {
+    "message": "Jahr"
+  },
+  "popup_authors": {
+    "message": "Autor:innen"
+  },
+  "popup_authors_placeholder": {
+    "message": "Nachname, Vorname; Nachname, Vorname"
+  },
+  "popup_author_literal": {
+    "message": "$1 (nicht zerlegt)"
+  },
+  "popup_container_title": {
+    "message": "Zeitschrift / Website"
+  },
+  "popup_publisher": {
+    "message": "Verlag"
+  },
+  "popup_place": {
+    "message": "Ort"
+  },
+  "popup_doi": {
+    "message": "DOI"
+  },
+  "popup_isbn": {
+    "message": "ISBN"
+  },
+  "popup_lookup": {
+    "message": "Kanonische Angaben holen"
+  },
+  "popup_lookup_recommended": {
+    "message": "Diese Seite trägt ein DOI – hol dir die kanonischen Angaben."
+  },
+  "popup_lookup_running": {
+    "message": "Wird nachgeschlagen …"
+  },
+  "popup_lookup_applied": {
+    "message": "$1 Feld(er) aus der Datenbank übernommen."
+  },
+  "popup_lookup_nothing_new": {
+    "message": "Keine zusätzlichen Angaben gefunden."
+  },
+  "popup_url": {
+    "message": "URL"
+  },
+  "popup_accessed_at": {
+    "message": "Abgerufen am"
+  },
+  "popup_citekey": {
+    "message": "Zitierschlüssel"
+  },
+  "popup_citekey_placeholder": {
+    "message": "leer lassen = Server vergibt"
+  },
+  "popup_note": {
+    "message": "Notiz zur Quelle"
+  },
+  "popup_attach_screenshot": {
+    "message": "Screenshot mitschicken"
+  },
+  "popup_attach_pdf": {
+    "message": "PDF mitschicken"
+  },
+  "popup_pdf_cross_origin": {
+    "message": "Das PDF liegt auf $1 – dafür fehlt die Berechtigung."
+  },
+  "popup_pdf_failed": {
+    "message": "Das PDF konnte nicht geladen werden ($1)."
+  },
+  "popup_duplicate_in_book": {
+    "message": "Diese Quelle ist bereits in diesem Buch."
+  },
+  "popup_duplicate_in_library": {
+    "message": "Diese Quelle ist schon in deiner Bibliothek, aber nicht in diesem Buch."
+  },
+  "popup_submit": {
+    "message": "Senden"
+  },
+  "popup_sending": {
+    "message": "Wird gesendet …"
+  },
+  "popup_close": {
+    "message": "Schließen"
+  },
+  "popup_saved": {
+    "message": "Gesichert in „$1“."
+  },
+  "popup_queued": {
+    "message": "Noch nicht durchgekommen – liegt in der Warteschlange. $1"
+  },
+  "popup_queue_chip": {
+    "message": "$1 in Warteschlange"
+  },
+  "provenance_citation": {
+    "message": "Angaben aus citation_*-Metadaten (verlagsseitig)"
+  },
+  "provenance_jsonld": {
+    "message": "Angaben aus JSON-LD (schema.org)"
+  },
+  "provenance_dublincore": {
+    "message": "Angaben aus Dublin Core"
+  },
+  "provenance_opengraph": {
+    "message": "Angaben aus OpenGraph – bitte prüfen"
+  },
+  "provenance_fallback": {
+    "message": "Keine Metadaten gefunden – alles geraten, bitte prüfen"
+  },
+  "provenance_byline_hint": {
+    "message": "mögliche Autorenzeile: $1"
+  },
+  "queue_state_held": {
+    "message": "Undo-Fenster läuft"
+  },
+  "queue_state_pending": {
+    "message": "wartet"
+  },
+  "queue_state_running": {
+    "message": "wird gesendet"
+  },
+  "queue_state_failed": {
+    "message": "gescheitert"
+  },
+  "options_document_title": {
+    "message": "Schreibwerkstatt – Einstellungen"
+  },
+  "options_heading": {
+    "message": "Schreibwerkstatt"
+  },
+  "options_lead": {
+    "message": "Erfasse Webseiten als Recherche-Fundstück oder als zitierfähige Quelle."
+  },
+  "options_section_connection": {
+    "message": "1. Verbindung"
+  },
+  "options_connection_lead": {
+    "message": "Trage die Adresse deiner Schreibwerkstatt ein und erzeuge in der Web-App unter Einstellungen → Geräte ein Token."
+  },
+  "options_server_url": {
+    "message": "Server-Adresse"
+  },
+  "options_server_url_placeholder": {
+    "message": "https://schreibwerkstatt.example.com"
+  },
+  "options_server_url_invalid": {
+    "message": "Das ist keine gültige http(s)-Adresse."
+  },
+  "options_server_url_insecure": {
+    "message": "Ohne TLS geht das Token im Klartext über die Leitung. Nur lokal sinnvoll."
+  },
+  "options_server_url_normalized": {
+    "message": "Wird verwendet als: $1"
+  },
+  "options_token": {
+    "message": "Geräte-Token"
+  },
+  "options_token_placeholder": {
+    "message": "swd_…"
+  },
+  "options_token_hint": {
+    "message": "Wird nur lokal gespeichert (chrome.storage.local), nie über dein Google-Konto synchronisiert."
+  },
+  "options_token_format": {
+    "message": "Erwartet wird ein Token, das mit swd_ beginnt."
+  },
+  "options_show_token": {
+    "message": "Zeigen"
+  },
+  "options_hide_token": {
+    "message": "Verbergen"
+  },
+  "options_save": {
+    "message": "Speichern"
+  },
+  "options_saved": {
+    "message": "Gespeichert"
+  },
+  "options_grant": {
+    "message": "Zugriff auf diesen Host erlauben"
+  },
+  "options_permission_granted": {
+    "message": "Zugriff auf $1 ist erteilt."
+  },
+  "options_permission_missing": {
+    "message": "Zugriff auf $1 fehlt noch – ohne ihn kann nichts gesendet werden."
+  },
+  "options_permission_denied": {
+    "message": "Die Berechtigung wurde abgelehnt."
+  },
+  "options_test": {
+    "message": "Verbindung testen"
+  },
+  "options_testing": {
+    "message": "Wird geprüft …"
+  },
+  "options_test_ok": {
+    "message": "Verbindung steht. $1 Bücher gefunden."
+  },
+  "options_section_books": {
+    "message": "2. Standardbuch"
+  },
+  "options_books_lead": {
+    "message": "Das Buch, in das Zitate aus dem Kontextmenü ohne Rückfrage wandern."
+  },
+  "options_default_book": {
+    "message": "Standardbuch"
+  },
+  "options_no_default_book": {
+    "message": "— keines —"
+  },
+  "options_refresh_books": {
+    "message": "Bücher neu laden"
+  },
+  "options_books_fetched": {
+    "message": "Zuletzt geladen $1."
+  },
+  "options_books_never": {
+    "message": "Noch nie geladen."
+  },
+  "options_section_behaviour": {
+    "message": "3. Verhalten"
+  },
+  "options_default_mode": {
+    "message": "Vorauswahl Ziel"
+  },
+  "options_default_kind": {
+    "message": "Vorauswahl Art"
+  },
+  "options_undo_delay": {
+    "message": "Undo-Fenster für Zitate (Sekunden)"
+  },
+  "options_undo_delay_hint": {
+    "message": "So lange wartet die Erweiterung, bevor sie ein Zitat wirklich sendet. 0 = sofort senden."
+  },
+  "options_harvest_text": {
+    "message": "Haupttext der Seite vorbefüllen"
+  },
+  "options_notifications": {
+    "message": "Erfolgs- und Undo-Hinweise anzeigen"
+  },
+  "options_duplicate_check": {
+    "message": "Vor dem Senden auf Dubletten prüfen"
+  },
+  "options_section_capabilities": {
+    "message": "4. Serverfähigkeiten"
+  },
+  "options_capabilities_lead": {
+    "message": "Zwei Endpunkte sind noch nicht überall ausgerollt. Die Erweiterung erkennt sie automatisch und fällt sonst auf den längeren Weg zurück."
+  },
+  "options_cap_endpoint": {
+    "message": "Endpunkt"
+  },
+  "options_cap_detected": {
+    "message": "Erkannt"
+  },
+  "options_cap_mode": {
+    "message": "Einstellung"
+  },
+  "options_cap_auto": {
+    "message": "automatisch"
+  },
+  "options_cap_on": {
+    "message": "erzwingen"
+  },
+  "options_cap_off": {
+    "message": "nicht benutzen"
+  },
+  "options_cap_yes": {
+    "message": "ja"
+  },
+  "options_cap_no": {
+    "message": "nein"
+  },
+  "options_cap_unknown": {
+    "message": "unbekannt"
+  },
+  "options_cap_probed": {
+    "message": "Zuletzt geprüft $1."
+  },
+  "options_cap_never_probed": {
+    "message": "Noch nicht geprüft – beim Verbindungstest passiert das automatisch."
+  },
+  "options_section_queue": {
+    "message": "5. Warteschlange"
+  },
+  "options_queue_lead": {
+    "message": "Was offline oder bei Serverfehlern nicht durchkam, wartet hier. Nichts wird von selbst verworfen."
+  },
+  "options_flush_queue": {
+    "message": "Jetzt alle wiederholen"
+  },
+  "options_queue_empty": {
+    "message": "Die Warteschlange ist leer."
+  },
+  "options_queue_untitled": {
+    "message": "(ohne Titel)"
+  },
+  "options_queue_attempts": {
+    "message": "$1 Versuch(e)"
+  },
+  "options_queue_retry": {
+    "message": "Erneut versuchen"
+  },
+  "options_queue_discard": {
+    "message": "Verwerfen"
+  },
+  "options_queue_discard_confirm": {
+    "message": "„$1“ endgültig verwerfen? Der Eintrag geht verloren."
+  },
+  "options_queue_attachment_lost": {
+    "message": "„Screenshot bzw. PDF ging beim Neustart des Browsers verloren. Der Eintrag selbst wird gesendet; den Anhang musst du in der Web-App nachreichen."
+  },
+  "options_section_privacy": {
+    "message": "6. Was verlässt den Browser"
+  },
+  "options_privacy_1": {
+    "message": "Nur was du ausdrücklich erfasst: Titel, Text, URL und bibliografische Angaben der Seite, die gerade offen ist."
+  },
+  "options_privacy_2": {
+    "message": "Ausschließlich an den oben eingetragenen Host. Kein Analytics, kein CDN, keine externen Schriftarten, kein Drittanbieter."
+  },
+  "options_privacy_3": {
+    "message": "Kein Verlauf, kein Hintergrund-Crawling, keine automatische Erfassung. Kein Zugriff auf Seiten, auf denen du die Erweiterung nicht auslöst."
+  },
+  "options_privacy_4": {
+    "message": "Das Token liegt in chrome.storage.local und wird nicht synchronisiert."
+  },
+  "options_version": {
+    "message": "Version $1"
+  }
+}

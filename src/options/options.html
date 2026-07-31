@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title data-i18n="options_document_title">Schreibwerkstatt – Einstellungen</title>
+    <link rel="stylesheet" href="../shared/ui.css" />
+    <link rel="stylesheet" href="options.css" />
+  </head>
+  <body class="options">
+    <div class="page">
+      <header class="page__header">
+        <h1 data-i18n="options_heading">Schreibwerkstatt</h1>
+        <p class="page__lead" data-i18n="options_lead">
+          Erfasse Webseiten als Recherche-Fundstück oder als zitierfähige Quelle.
+        </p>
+      </header>
+
+      <!-- 1. Verbindung -->
+      <section class="card">
+        <h2 data-i18n="options_section_connection">1. Verbindung</h2>
+        <p class="card__lead" data-i18n="options_connection_lead">
+          Trage die Adresse deiner Schreibwerkstatt ein und erzeuge in der Web-App unter
+          Einstellungen → Geräte ein Token.
+        </p>
+
+        <div class="field">
+          <label class="field__label" for="server-url" data-i18n="options_server_url">Server-Adresse</label>
+          <input
+            type="url"
+            id="server-url"
+            class="input"
+            data-i18n-attr="placeholder:options_server_url_placeholder"
+            autocomplete="off"
+            spellcheck="false"
+          />
+          <p class="field__hint" id="server-url-hint"></p>
+        </div>
+
+        <div class="field">
+          <label class="field__label" for="token" data-i18n="options_token">Geräte-Token</label>
+          <div class="row">
+            <input
+              type="password"
+              id="token"
+              class="input"
+              data-i18n-attr="placeholder:options_token_placeholder"
+              autocomplete="off"
+              spellcheck="false"
+            />
+            <button type="button" id="toggle-token" class="button" data-i18n="options_show_token">Zeigen</button>
+          </div>
+          <p class="field__hint" data-i18n="options_token_hint">
+            Wird nur lokal gespeichert (chrome.storage.local), nie über dein Google-Konto synchronisiert.
+          </p>
+          <p class="field__hint field__hint--warn" id="token-format-hint" hidden data-i18n="options_token_format">
+            Erwartet wird ein Token, das mit swd_ beginnt.
+          </p>
+        </div>
+
+        <div class="actions">
+          <button type="button" id="save-connection" class="button button--primary" data-i18n="options_save">
+            Speichern
+          </button>
+          <button type="button" id="grant-permission" class="button" data-i18n="options_grant">
+            Zugriff auf diesen Host erlauben
+          </button>
+          <button type="button" id="test-connection" class="button" data-i18n="options_test">Verbindung testen</button>
+        </div>
+
+        <p id="permission-state" class="notice notice--muted" hidden></p>
+        <p id="connection-result" class="notice" hidden></p>
+      </section>
+
+      <!-- 2. Bücher -->
+      <section class="card">
+        <h2 data-i18n="options_section_books">2. Standardbuch</h2>
+        <p class="card__lead" data-i18n="options_books_lead">
+          Das Buch, in das Zitate aus dem Kontextmenü ohne Rückfrage wandern.
+        </p>
+
+        <div class="field">
+          <label class="field__label" for="default-book" data-i18n="options_default_book">Standardbuch</label>
+          <select id="default-book" class="input"></select>
+          <p class="field__hint" id="books-meta"></p>
+        </div>
+
+        <div class="actions">
+          <button type="button" id="refresh-books" class="button" data-i18n="options_refresh_books">
+            Bücher neu laden
+          </button>
+        </div>
+
+        <ul class="booklist" id="booklist"></ul>
+      </section>
+
+      <!-- 3. Verhalten -->
+      <section class="card">
+        <h2 data-i18n="options_section_behaviour">3. Verhalten</h2>
+
+        <div class="field field--split">
+          <div>
+            <label class="field__label" for="default-mode" data-i18n="options_default_mode">Vorauswahl Ziel</label>
+            <select id="default-mode" class="input">
+              <option value="research" data-i18n="mode_research">Recherche</option>
+              <option value="source" data-i18n="mode_source">Quelle</option>
+              <option value="both" data-i18n="mode_both">Beides</option>
+            </select>
+          </div>
+          <div>
+            <label class="field__label" for="default-kind" data-i18n="options_default_kind">Vorauswahl Art</label>
+            <select id="default-kind" class="input">
+              <option value="note" data-i18n="kind_note">Notiz</option>
+              <option value="link" data-i18n="kind_link">Link</option>
+              <option value="quote" data-i18n="kind_quote">Zitat</option>
+              <option value="fact" data-i18n="kind_fact">Fakt</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="field__label" for="undo-delay" data-i18n="options_undo_delay">
+            Undo-Fenster für Zitate (Sekunden)
+          </label>
+          <input type="number" id="undo-delay" class="input input--narrow" min="0" max="30" step="1" />
+          <p class="field__hint" data-i18n="options_undo_delay_hint">
+            So lange wartet die Erweiterung, bevor sie ein Zitat wirklich sendet. 0 = sofort senden.
+          </p>
+        </div>
+
+        <div class="field field--checks">
+          <label class="check">
+            <input type="checkbox" id="harvest-article-text" />
+            <span data-i18n="options_harvest_text">Haupttext der Seite vorbefüllen</span>
+          </label>
+          <label class="check">
+            <input type="checkbox" id="notifications" />
+            <span data-i18n="options_notifications">Erfolgs- und Undo-Hinweise anzeigen</span>
+          </label>
+          <label class="check">
+            <input type="checkbox" id="duplicate-check" />
+            <span data-i18n="options_duplicate_check">Vor dem Senden auf Dubletten prüfen</span>
+          </label>
+        </div>
+
+        <div class="actions">
+          <button type="button" id="save-settings" class="button button--primary" data-i18n="options_save">
+            Speichern
+          </button>
+          <span id="settings-saved" class="chip chip--ok" hidden data-i18n="options_saved">Gespeichert</span>
+        </div>
+      </section>
+
+      <!-- 4. Serverfähigkeiten -->
+      <section class="card">
+        <h2 data-i18n="options_section_capabilities">4. Serverfähigkeiten</h2>
+        <p class="card__lead" data-i18n="options_capabilities_lead">
+          Zwei Endpunkte sind noch nicht überall ausgerollt. Die Erweiterung erkennt sie automatisch und
+          fällt sonst auf den längeren Weg zurück.
+        </p>
+
+        <table class="table">
+          <thead>
+            <tr>
+              <th data-i18n="options_cap_endpoint">Endpunkt</th>
+              <th data-i18n="options_cap_detected">Erkannt</th>
+              <th data-i18n="options_cap_mode">Einstellung</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code class="code">POST /capture</code></td>
+              <td id="cap-capture-detected">–</td>
+              <td>
+                <select id="cap-capture-mode" class="input input--narrow">
+                  <option value="auto" data-i18n="options_cap_auto">automatisch</option>
+                  <option value="on" data-i18n="options_cap_on">erzwingen</option>
+                  <option value="off" data-i18n="options_cap_off">nicht benutzen</option>
+                </select>
+              </td>
+            </tr>
+            <tr>
+              <td><code class="code">GET /sources/by-url</code></td>
+              <td id="cap-byurl-detected">–</td>
+              <td>
+                <select id="cap-byurl-mode" class="input input--narrow">
+                  <option value="auto" data-i18n="options_cap_auto">automatisch</option>
+                  <option value="on" data-i18n="options_cap_on">erzwingen</option>
+                  <option value="off" data-i18n="options_cap_off">nicht benutzen</option>
+                </select>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <p class="field__hint" id="cap-probed-at"></p>
+      </section>
+
+      <!-- 5. Warteschlange -->
+      <section class="card">
+        <h2 data-i18n="options_section_queue">5. Warteschlange</h2>
+        <p class="card__lead" data-i18n="options_queue_lead">
+          Was offline oder bei Serverfehlern nicht durchkam, wartet hier. Nichts wird von selbst verworfen.
+        </p>
+
+        <div class="actions">
+          <button type="button" id="flush-queue" class="button" data-i18n="options_flush_queue">
+            Jetzt alle wiederholen
+          </button>
+        </div>
+
+        <ul class="queue" id="queue"></ul>
+        <p class="field__hint" id="queue-empty" data-i18n="options_queue_empty">Die Warteschlange ist leer.</p>
+      </section>
+
+      <!-- 6. Datenschutz -->
+      <section class="card">
+        <h2 data-i18n="options_section_privacy">6. Was verlässt den Browser</h2>
+        <ul class="bullets">
+          <li data-i18n="options_privacy_1">
+            Nur was du ausdrücklich erfasst: Titel, Text, URL und bibliografische Angaben der Seite,
+            die gerade offen ist.
+          </li>
+          <li data-i18n="options_privacy_2">
+            Ausschließlich an den oben eingetragenen Host. Kein Analytics, kein CDN, keine externen
+            Schriftarten, kein Drittanbieter.
+          </li>
+          <li data-i18n="options_privacy_3">
+            Kein Verlauf, kein Hintergrund-Crawling, keine automatische Erfassung. Kein Zugriff auf
+            Seiten, auf denen du die Erweiterung nicht auslöst.
+          </li>
+          <li data-i18n="options_privacy_4">
+            Das Token liegt in chrome.storage.local und wird nicht synchronisiert.
+          </li>
+        </ul>
+        <p class="field__hint" id="version-line"></p>
+      </section>
+    </div>
+
+    <script type="module" src="options.js"></script>
+  </body>
+</html>

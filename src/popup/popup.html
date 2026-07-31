@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title data-i18n="popup_document_title">Schreibwerkstatt</title>
+    <link rel="stylesheet" href="../shared/ui.css" />
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body class="popup">
+    <header class="bar">
+      <h1 class="bar__title" data-i18n="popup_heading">Erfassen</h1>
+      <div class="bar__actions">
+        <span id="queue-chip" class="chip chip--muted" hidden></span>
+        <button type="button" id="open-options" class="icon-button" data-i18n-attr="title:popup_open_options">
+          <span aria-hidden="true">⚙</span>
+          <span class="sr-only" data-i18n="popup_open_options">Einstellungen</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Einrichtung fehlt -->
+    <section id="setup-needed" class="panel panel--notice" hidden>
+      <p data-i18n="popup_setup_needed">Bitte zuerst Server und Token in den Einstellungen hinterlegen.</p>
+      <button type="button" id="goto-options" class="button button--primary" data-i18n="popup_goto_options">
+        Einstellungen öffnen
+      </button>
+    </section>
+
+    <!-- Token ungültig -->
+    <section id="token-problem" class="panel panel--error" hidden>
+      <p id="token-problem-text"></p>
+      <button type="button" id="goto-options-2" class="button" data-i18n="popup_goto_options">Einstellungen öffnen</button>
+    </section>
+
+    <!-- Ladezustand -->
+    <section id="loading" class="panel">
+      <p data-i18n="popup_harvesting">Seite wird ausgewertet …</p>
+    </section>
+
+    <form id="capture-form" class="form" hidden>
+      <!-- Ziel -->
+      <fieldset class="field">
+        <legend class="field__label" data-i18n="popup_target">Ziel</legend>
+        <div class="segmented" role="radiogroup">
+          <label class="segmented__option">
+            <input type="radio" name="mode" value="research" checked />
+            <span data-i18n="mode_research">Recherche</span>
+          </label>
+          <label class="segmented__option">
+            <input type="radio" name="mode" value="source" />
+            <span data-i18n="mode_source">Quelle</span>
+          </label>
+          <label class="segmented__option">
+            <input type="radio" name="mode" value="both" />
+            <span data-i18n="mode_both">Beides</span>
+          </label>
+        </div>
+      </fieldset>
+
+      <!-- Buch -->
+      <div class="field">
+        <label class="field__label" for="book" data-i18n="popup_book">Buch</label>
+        <select id="book" name="book" class="input" required></select>
+        <p class="field__hint" id="book-hint" hidden data-i18n="popup_book_viewer_hint">
+          Bücher, in denen du nur Leserecht hast, sind ausgegraut.
+        </p>
+      </div>
+
+      <!-- Dublettenhinweis -->
+      <p id="duplicate-notice" class="notice notice--info" hidden></p>
+      <!-- Herkunftshinweis -->
+      <p id="provenance-notice" class="notice notice--muted" hidden></p>
+
+      <!-- Recherche -->
+      <div id="research-fields">
+        <div class="field field--split">
+          <div>
+            <label class="field__label" for="kind" data-i18n="popup_kind">Art</label>
+            <select id="kind" name="kind" class="input">
+              <option value="note" data-i18n="kind_note">Notiz</option>
+              <option value="link" data-i18n="kind_link">Link</option>
+              <option value="quote" data-i18n="kind_quote">Zitat</option>
+              <option value="fact" data-i18n="kind_fact">Fakt</option>
+            </select>
+          </div>
+          <div>
+            <label class="field__label" for="tags" data-i18n="popup_tags">Schlagwörter</label>
+            <input
+              type="text"
+              id="tags"
+              name="tags"
+              class="input"
+              data-i18n-attr="placeholder:popup_tags_placeholder"
+              autocomplete="off"
+            />
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="field__label" for="title">
+            <span data-i18n="popup_title">Titel</span>
+            <span class="counter" id="title-counter"></span>
+          </label>
+          <input type="text" id="title" name="title" class="input" maxlength="300" autocomplete="off" />
+        </div>
+
+        <div class="field">
+          <label class="field__label" for="body">
+            <span data-i18n="popup_body">Text</span>
+            <span class="counter" id="body-counter"></span>
+          </label>
+          <textarea id="body" name="body" class="input input--area" rows="7"></textarea>
+          <p class="field__hint field__hint--warn" id="truncation-hint" hidden></p>
+          <p class="field__hint field__hint--warn" id="verbatim-hint" hidden data-i18n="popup_verbatim_hint">
+            Markierter Wortlaut — unverändert übernommen.
+          </p>
+        </div>
+      </div>
+
+      <!-- Quelle -->
+      <details id="source-fields" class="disclosure">
+        <summary class="disclosure__summary" data-i18n="popup_source_details">Angaben zur Quelle</summary>
+
+        <div class="field field--split">
+          <div>
+            <label class="field__label" for="csl-type" data-i18n="popup_csl_type">Typ</label>
+            <select id="csl-type" name="csl_type" class="input"></select>
+          </div>
+          <div>
+            <label class="field__label" for="year" data-i18n="popup_year">Jahr</label>
+            <input type="text" id="year" name="year" class="input" inputmode="numeric" autocomplete="off" />
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="field__label" for="authors">
+            <span data-i18n="popup_authors">Autor:innen</span>
+          </label>
+          <input
+            type="text"
+            id="authors"
+            name="authors"
+            class="input"
+            data-i18n-attr="placeholder:popup_authors_placeholder"
+            autocomplete="off"
+          />
+          <p class="field__hint" id="authors-parsed"></p>
+        </div>
+
+        <div class="field">
+          <label class="field__label" for="container-title" data-i18n="popup_container_title">
+            Zeitschrift / Website
+          </label>
+          <input type="text" id="container-title" name="container_title" class="input" autocomplete="off" />
+        </div>
+
+        <div class="field field--split">
+          <div>
+            <label class="field__label" for="publisher" data-i18n="popup_publisher">Verlag</label>
+            <input type="text" id="publisher" name="publisher" class="input" autocomplete="off" />
+          </div>
+          <div>
+            <label class="field__label" for="place" data-i18n="popup_place">Ort</label>
+            <input type="text" id="place" name="place" class="input" autocomplete="off" />
+          </div>
+        </div>
+
+        <div class="field field--split">
+          <div>
+            <label class="field__label" for="doi" data-i18n="popup_doi">DOI</label>
+            <input type="text" id="doi" name="doi" class="input" autocomplete="off" />
+          </div>
+          <div>
+            <label class="field__label" for="isbn" data-i18n="popup_isbn">ISBN</label>
+            <input type="text" id="isbn" name="isbn" class="input" autocomplete="off" />
+          </div>
+        </div>
+
+        <button type="button" id="lookup" class="button button--ghost" hidden data-i18n="popup_lookup">
+          Kanonische Angaben holen
+        </button>
+        <p class="field__hint" id="lookup-status" hidden></p>
+
+        <div class="field">
+          <label class="field__label" for="source-url" data-i18n="popup_url">URL</label>
+          <input type="url" id="source-url" name="url" class="input" autocomplete="off" />
+        </div>
+
+        <div class="field field--split">
+          <div>
+            <label class="field__label" for="accessed-at" data-i18n="popup_accessed_at">Abgerufen am</label>
+            <input type="date" id="accessed-at" name="accessed_at" class="input" />
+          </div>
+          <div>
+            <label class="field__label" for="citekey" data-i18n="popup_citekey">Zitierschlüssel</label>
+            <input
+              type="text"
+              id="citekey"
+              name="citekey"
+              class="input"
+              data-i18n-attr="placeholder:popup_citekey_placeholder"
+              autocomplete="off"
+            />
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="field__label" for="note" data-i18n="popup_note">Notiz zur Quelle</label>
+          <textarea id="note" name="note" class="input input--area" rows="2"></textarea>
+        </div>
+      </details>
+
+      <!-- Anhänge -->
+      <div class="field field--checks">
+        <label class="check">
+          <input type="checkbox" id="attach-screenshot" />
+          <span data-i18n="popup_attach_screenshot">Screenshot mitschicken</span>
+        </label>
+        <label class="check" id="attach-pdf-row" hidden>
+          <input type="checkbox" id="attach-pdf" />
+          <span data-i18n="popup_attach_pdf">PDF mitschicken</span>
+        </label>
+        <p class="field__hint" id="pdf-hint" hidden></p>
+      </div>
+
+      <p id="form-error" class="notice notice--error" hidden></p>
+      <p id="form-success" class="notice notice--success" hidden></p>
+
+      <div class="actions">
+        <button type="submit" id="submit" class="button button--primary" data-i18n="popup_submit">Senden</button>
+        <button type="button" id="cancel" class="button" data-i18n="popup_close">Schließen</button>
+      </div>
+    </form>
+
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>

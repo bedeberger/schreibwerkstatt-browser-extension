@@ -1,0 +1,37 @@
+/* Nur popup-spezifische Ergaenzungen; die Basis steht in shared/ui.css. */
+
+.popup {
+  width: 400px;
+  max-height: 580px;
+  overflow-y: auto;
+}
+
+.popup .bar {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.popup .actions {
+  position: sticky;
+  bottom: 0;
+  padding-top: 10px;
+  margin: 0 -14px -14px;
+  padding-right: 14px;
+  padding-bottom: 14px;
+  padding-left: 14px;
+  background: linear-gradient(to bottom, transparent, var(--paper) 35%);
+}
+
+/* Buecher ohne Schreibrecht bleiben sichtbar, aber nicht waehlbar. */
+.popup option:disabled {
+  color: var(--ink-faint);
+}
+
+#authors-parsed:empty {
+  display: none;
+}
+
+#body {
+  min-height: 96px;
+}

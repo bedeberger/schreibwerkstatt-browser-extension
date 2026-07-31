@@ -1,0 +1,635 @@
+{
+  "lang_code": {
+    "message": "en"
+  },
+  "ext_name": {
+    "message": "Schreibwerkstatt – Capture"
+  },
+  "ext_description": {
+    "message": "Send web pages to your Schreibwerkstatt as a research find or a citable source."
+  },
+  "action_title": {
+    "message": "Capture this page into Schreibwerkstatt"
+  },
+  "command_open_popup": {
+    "message": "Open the capture popup"
+  },
+  "command_capture_quote": {
+    "message": "Capture selection as a quote"
+  },
+  "context_menu_capture_quote": {
+    "message": "Capture as quote"
+  },
+  "badge_token_problem": {
+    "message": "Token problem – open settings"
+  },
+  "badge_pending": {
+    "message": "$1 item(s) waiting to be sent"
+  },
+  "badge_failed": {
+    "message": "$1 item(s) failed"
+  },
+  "notify_saved_title": {
+    "message": "Saved"
+  },
+  "notify_saved_research": {
+    "message": "Filed as a research find in “$1”."
+  },
+  "notify_saved_source": {
+    "message": "Filed as a source in your library."
+  },
+  "notify_saved_both": {
+    "message": "Filed as a find and as a source in “$1”."
+  },
+  "notify_failed_title": {
+    "message": "Not saved"
+  },
+  "notify_quote_captured_title": {
+    "message": "Quote captured"
+  },
+  "notify_quote_captured_message": {
+    "message": "Going to “$1” in $2 seconds."
+  },
+  "notify_undo_button": {
+    "message": "Undo"
+  },
+  "notify_undone_title": {
+    "message": "Withdrawn"
+  },
+  "notify_undone_message": {
+    "message": "The quote was not sent."
+  },
+  "notify_undo_too_late_title": {
+    "message": "Too late"
+  },
+  "notify_undo_too_late_message": {
+    "message": "The quote is already on its way."
+  },
+  "notify_setup_needed_title": {
+    "message": "Not set up yet"
+  },
+  "notify_setup_needed_message": {
+    "message": "Enter the server address and token first."
+  },
+  "notify_no_book_title": {
+    "message": "No default book"
+  },
+  "notify_no_book_message": {
+    "message": "Pick a default book for quotes in the settings."
+  },
+  "notify_no_selection_title": {
+    "message": "Nothing selected"
+  },
+  "notify_no_selection_message": {
+    "message": "Select the text you want to quote first."
+  },
+  "notify_quote_too_long_title": {
+    "message": "Quote too long"
+  },
+  "notify_quote_too_long_message": {
+    "message": "The limit is $1 characters, the selection had $2."
+  },
+  "err_not_logged_in": {
+    "message": "The device token is no longer valid. Create a new one in the web app."
+  },
+  "err_capture_scope_required": {
+    "message": "This token is not allowed to capture. Create a token with capture permission in the web app."
+  },
+  "err_source_identity_req": {
+    "message": "A source needs at least a title or one person."
+  },
+  "err_citekey_taken": {
+    "message": "That citation key is already taken."
+  },
+  "err_book_not_found": {
+    "message": "That book does not exist (any more)."
+  },
+  "err_book_access_denied": {
+    "message": "You cannot write to that book."
+  },
+  "err_forbidden": {
+    "message": "The server refused access."
+  },
+  "err_validation_failed": {
+    "message": "The server rejected the data."
+  },
+  "err_payload_too_large": {
+    "message": "The payload is too large for the server."
+  },
+  "err_unsupported_media_type": {
+    "message": "The server does not accept this file type."
+  },
+  "err_rate_limited": {
+    "message": "Too many requests. It will be retried later."
+  },
+  "err_not_found": {
+    "message": "Not found."
+  },
+  "err_server_error": {
+    "message": "The server reported an error. It will be retried later."
+  },
+  "err_network": {
+    "message": "No connection to the server. The item is waiting in the queue."
+  },
+  "err_status_400": {
+    "message": "The request was malformed."
+  },
+  "err_status_403": {
+    "message": "Not allowed."
+  },
+  "err_status_404": {
+    "message": "Your server does not have this endpoint."
+  },
+  "err_status_409": {
+    "message": "Conflict with an existing entry."
+  },
+  "err_status_timeout": {
+    "message": "The server did not answer in time."
+  },
+  "err_unknown": {
+    "message": "Unknown error."
+  },
+  "validation_book_required": {
+    "message": "Please pick a book."
+  },
+  "validation_kind_invalid": {
+    "message": "Invalid kind of research find."
+  },
+  "validation_title_too_long": {
+    "message": "The title may be at most $1 characters, it currently has $2."
+  },
+  "validation_body_too_long": {
+    "message": "The text may be at most $1 characters, it currently has $2."
+  },
+  "validation_research_empty": {
+    "message": "Title, text or URL – at least one must be filled in."
+  },
+  "validation_csl_type_invalid": {
+    "message": "Please pick a valid source type."
+  },
+  "validation_source_identity": {
+    "message": "A source needs at least a title or one person."
+  },
+  "validation_url_scheme": {
+    "message": "The URL must start with http:// or https://."
+  },
+  "validation_year_invalid": {
+    "message": "Please enter a four-digit year."
+  },
+  "validation_image_too_large": {
+    "message": "The image may be at most $1 MB, it is $2 MB."
+  },
+  "validation_doc_too_large": {
+    "message": "The PDF may be at most $1 MB, it is $2 MB."
+  },
+  "mode_research": {
+    "message": "Research"
+  },
+  "mode_source": {
+    "message": "Source"
+  },
+  "mode_both": {
+    "message": "Both"
+  },
+  "kind_note": {
+    "message": "Note"
+  },
+  "kind_link": {
+    "message": "Link"
+  },
+  "kind_quote": {
+    "message": "Quote"
+  },
+  "kind_fact": {
+    "message": "Fact"
+  },
+  "role_owner": {
+    "message": "owner"
+  },
+  "role_editor": {
+    "message": "editor"
+  },
+  "role_viewer": {
+    "message": "read only"
+  },
+  "csl_book": {
+    "message": "Book"
+  },
+  "csl_chapter": {
+    "message": "Book chapter"
+  },
+  "csl_article": {
+    "message": "Journal article"
+  },
+  "csl_website": {
+    "message": "Web page"
+  },
+  "csl_thesis": {
+    "message": "Thesis"
+  },
+  "csl_report": {
+    "message": "Report"
+  },
+  "csl_legal": {
+    "message": "Legal source"
+  },
+  "csl_interview": {
+    "message": "Interview"
+  },
+  "csl_film": {
+    "message": "Film"
+  },
+  "csl_dataset": {
+    "message": "Dataset"
+  },
+  "csl_other": {
+    "message": "Other"
+  },
+  "popup_document_title": {
+    "message": "Capture"
+  },
+  "popup_heading": {
+    "message": "Capture"
+  },
+  "popup_open_options": {
+    "message": "Settings"
+  },
+  "popup_setup_needed": {
+    "message": "Please enter the server address and token in the settings first."
+  },
+  "popup_goto_options": {
+    "message": "Open settings"
+  },
+  "popup_harvesting": {
+    "message": "Reading the page …"
+  },
+  "popup_target": {
+    "message": "Target"
+  },
+  "popup_book": {
+    "message": "Book"
+  },
+  "popup_no_books": {
+    "message": "No books loaded"
+  },
+  "popup_book_viewer_hint": {
+    "message": "Books you can only read are greyed out."
+  },
+  "popup_kind": {
+    "message": "Kind"
+  },
+  "popup_tags": {
+    "message": "Tags"
+  },
+  "popup_tags_placeholder": {
+    "message": "comma separated"
+  },
+  "popup_title": {
+    "message": "Title"
+  },
+  "popup_body": {
+    "message": "Text"
+  },
+  "popup_verbatim_hint": {
+    "message": "Selected wording – taken over unchanged."
+  },
+  "popup_truncated_hint": {
+    "message": "Shortened to $1 characters (original: $2), cut at a sentence boundary."
+  },
+  "popup_source_details": {
+    "message": "Source details"
+  },
+  "popup_csl_type": {
+    "message": "Type"
+  },
+  "popup_year": {
+    "message": "Year"
+  },
+  "popup_authors": {
+    "message": "Authors"
+  },
+  "popup_authors_placeholder": {
+    "message": "Family, Given; Family, Given"
+  },
+  "popup_author_literal": {
+    "message": "$1 (not split)"
+  },
+  "popup_container_title": {
+    "message": "Journal / website"
+  },
+  "popup_publisher": {
+    "message": "Publisher"
+  },
+  "popup_place": {
+    "message": "Place"
+  },
+  "popup_doi": {
+    "message": "DOI"
+  },
+  "popup_isbn": {
+    "message": "ISBN"
+  },
+  "popup_lookup": {
+    "message": "Fetch canonical metadata"
+  },
+  "popup_lookup_recommended": {
+    "message": "This page carries a DOI – fetch the canonical metadata."
+  },
+  "popup_lookup_running": {
+    "message": "Looking up …"
+  },
+  "popup_lookup_applied": {
+    "message": "Took over $1 field(s) from the database."
+  },
+  "popup_lookup_nothing_new": {
+    "message": "No additional metadata found."
+  },
+  "popup_url": {
+    "message": "URL"
+  },
+  "popup_accessed_at": {
+    "message": "Accessed on"
+  },
+  "popup_citekey": {
+    "message": "Citation key"
+  },
+  "popup_citekey_placeholder": {
+    "message": "leave empty = server assigns"
+  },
+  "popup_note": {
+    "message": "Note on the source"
+  },
+  "popup_attach_screenshot": {
+    "message": "Attach screenshot"
+  },
+  "popup_attach_pdf": {
+    "message": "Attach PDF"
+  },
+  "popup_pdf_cross_origin": {
+    "message": "The PDF lives on $1 – no permission for that host."
+  },
+  "popup_pdf_failed": {
+    "message": "The PDF could not be loaded ($1)."
+  },
+  "popup_duplicate_in_book": {
+    "message": "This source is already in this book."
+  },
+  "popup_duplicate_in_library": {
+    "message": "This source is already in your library, but not in this book."
+  },
+  "popup_submit": {
+    "message": "Send"
+  },
+  "popup_sending": {
+    "message": "Sending …"
+  },
+  "popup_close": {
+    "message": "Close"
+  },
+  "popup_saved": {
+    "message": "Saved to “$1”."
+  },
+  "popup_queued": {
+    "message": "Did not get through – waiting in the queue. $1"
+  },
+  "popup_queue_chip": {
+    "message": "$1 queued"
+  },
+  "provenance_citation": {
+    "message": "Metadata from citation_* tags (publisher-supplied)"
+  },
+  "provenance_jsonld": {
+    "message": "Metadata from JSON-LD (schema.org)"
+  },
+  "provenance_dublincore": {
+    "message": "Metadata from Dublin Core"
+  },
+  "provenance_opengraph": {
+    "message": "Metadata from OpenGraph – please check"
+  },
+  "provenance_fallback": {
+    "message": "No metadata found – everything guessed, please check"
+  },
+  "provenance_byline_hint": {
+    "message": "possible byline: $1"
+  },
+  "queue_state_held": {
+    "message": "undo window open"
+  },
+  "queue_state_pending": {
+    "message": "waiting"
+  },
+  "queue_state_running": {
+    "message": "sending"
+  },
+  "queue_state_failed": {
+    "message": "failed"
+  },
+  "options_document_title": {
+    "message": "Schreibwerkstatt – Settings"
+  },
+  "options_heading": {
+    "message": "Schreibwerkstatt"
+  },
+  "options_lead": {
+    "message": "Capture web pages as a research find or as a citable source."
+  },
+  "options_section_connection": {
+    "message": "1. Connection"
+  },
+  "options_connection_lead": {
+    "message": "Enter the address of your Schreibwerkstatt and create a token in the web app under Settings → Devices."
+  },
+  "options_server_url": {
+    "message": "Server address"
+  },
+  "options_server_url_placeholder": {
+    "message": "https://schreibwerkstatt.example.com"
+  },
+  "options_server_url_invalid": {
+    "message": "That is not a valid http(s) address."
+  },
+  "options_server_url_insecure": {
+    "message": "Without TLS the token travels in the clear. Only sensible locally."
+  },
+  "options_server_url_normalized": {
+    "message": "Will be used as: $1"
+  },
+  "options_token": {
+    "message": "Device token"
+  },
+  "options_token_placeholder": {
+    "message": "swd_…"
+  },
+  "options_token_hint": {
+    "message": "Stored locally only (chrome.storage.local), never synced through your Google account."
+  },
+  "options_token_format": {
+    "message": "A token starting with swd_ is expected."
+  },
+  "options_show_token": {
+    "message": "Show"
+  },
+  "options_hide_token": {
+    "message": "Hide"
+  },
+  "options_save": {
+    "message": "Save"
+  },
+  "options_saved": {
+    "message": "Saved"
+  },
+  "options_grant": {
+    "message": "Allow access to this host"
+  },
+  "options_permission_granted": {
+    "message": "Access to $1 has been granted."
+  },
+  "options_permission_missing": {
+    "message": "Access to $1 is still missing – nothing can be sent without it."
+  },
+  "options_permission_denied": {
+    "message": "The permission was declined."
+  },
+  "options_test": {
+    "message": "Test connection"
+  },
+  "options_testing": {
+    "message": "Checking …"
+  },
+  "options_test_ok": {
+    "message": "Connection works. Found $1 books."
+  },
+  "options_section_books": {
+    "message": "2. Default book"
+  },
+  "options_books_lead": {
+    "message": "The book that quotes from the context menu go to without asking."
+  },
+  "options_default_book": {
+    "message": "Default book"
+  },
+  "options_no_default_book": {
+    "message": "— none —"
+  },
+  "options_refresh_books": {
+    "message": "Reload books"
+  },
+  "options_books_fetched": {
+    "message": "Last loaded $1."
+  },
+  "options_books_never": {
+    "message": "Never loaded."
+  },
+  "options_section_behaviour": {
+    "message": "3. Behaviour"
+  },
+  "options_default_mode": {
+    "message": "Default target"
+  },
+  "options_default_kind": {
+    "message": "Default kind"
+  },
+  "options_undo_delay": {
+    "message": "Undo window for quotes (seconds)"
+  },
+  "options_undo_delay_hint": {
+    "message": "How long the extension waits before actually sending a quote. 0 = send immediately."
+  },
+  "options_harvest_text": {
+    "message": "Prefill the main text of the page"
+  },
+  "options_notifications": {
+    "message": "Show success and undo notifications"
+  },
+  "options_duplicate_check": {
+    "message": "Check for duplicates before sending"
+  },
+  "options_section_capabilities": {
+    "message": "4. Server capabilities"
+  },
+  "options_capabilities_lead": {
+    "message": "Two endpoints are not rolled out everywhere yet. The extension detects them automatically and otherwise falls back to the longer path."
+  },
+  "options_cap_endpoint": {
+    "message": "Endpoint"
+  },
+  "options_cap_detected": {
+    "message": "Detected"
+  },
+  "options_cap_mode": {
+    "message": "Setting"
+  },
+  "options_cap_auto": {
+    "message": "automatic"
+  },
+  "options_cap_on": {
+    "message": "force on"
+  },
+  "options_cap_off": {
+    "message": "do not use"
+  },
+  "options_cap_yes": {
+    "message": "yes"
+  },
+  "options_cap_no": {
+    "message": "no"
+  },
+  "options_cap_unknown": {
+    "message": "unknown"
+  },
+  "options_cap_probed": {
+    "message": "Last checked $1."
+  },
+  "options_cap_never_probed": {
+    "message": "Not checked yet – the connection test does it automatically."
+  },
+  "options_section_queue": {
+    "message": "5. Queue"
+  },
+  "options_queue_lead": {
+    "message": "Whatever did not get through while offline or during server errors waits here. Nothing is discarded on its own."
+  },
+  "options_flush_queue": {
+    "message": "Retry all now"
+  },
+  "options_queue_empty": {
+    "message": "The queue is empty."
+  },
+  "options_queue_untitled": {
+    "message": "(untitled)"
+  },
+  "options_queue_attempts": {
+    "message": "$1 attempt(s)"
+  },
+  "options_queue_retry": {
+    "message": "Retry"
+  },
+  "options_queue_discard": {
+    "message": "Discard"
+  },
+  "options_queue_discard_confirm": {
+    "message": "Discard “$1” for good? The entry will be lost."
+  },
+  "options_queue_attachment_lost": {
+    "message": "The screenshot or PDF was lost when the browser restarted. The entry itself is still sent; attach the file again in the web app."
+  },
+  "options_section_privacy": {
+    "message": "6. What leaves the browser"
+  },
+  "options_privacy_1": {
+    "message": "Only what you explicitly capture: title, text, URL and bibliographic data of the page currently open."
+  },
+  "options_privacy_2": {
+    "message": "Only to the host entered above. No analytics, no CDN, no external fonts, no third party."
+  },
+  "options_privacy_3": {
+    "message": "No history, no background crawling, no automatic capture. No access to pages where you do not trigger the extension."
+  },
+  "options_privacy_4": {
+    "message": "The token lives in chrome.storage.local and is not synced."
+  },
+  "options_version": {
+    "message": "Version $1"
+  }
+}

@@ -21,6 +21,7 @@ ausschließlich deren REST-JSON-API an, unter der Adresse, die du selbst einträ
 - [Verhalten im Detail](#verhalten-im-detail)
 - [Getroffene Annahmen](#getroffene-annahmen)
 - [Drittcode und Lizenzen](#drittcode-und-lizenzen)
+- [Veröffentlichen](#veröffentlichen)
 
 ---
 
@@ -253,6 +254,8 @@ npm run build      # dist/ erzeugen
 npm run watch      # dist/ beobachten (statische Dateien nur beim Start kopiert)
 npm test           # 224 Tests, kein Server nötig
 npm run icons      # Symbole aus tools/make-icons.mjs neu erzeugen
+npm run package    # store-fertiges ZIP unter store/ erzeugen
+npm run promo      # Werbekacheln für den Store rendern (braucht Chrome)
 npm run clean      # dist/ löschen
 ```
 
@@ -426,3 +429,36 @@ und für den Chrome Web Store unproblematisch; entscheidend ist, dass der Code
 Der Lizenzkopf bleibt im Bundle erhalten (`legalComments: 'inline'`).
 
 Eigener Code: MIT.
+
+---
+
+## Veröffentlichen
+
+Alles für den Chrome Web Store liegt in [`store/`](store/):
+
+```bash
+npm run package    # store/schreibwerkstatt-chrome-<version>.zip
+npm run promo      # store/assets/ — die beiden Werbekacheln
+```
+
+Die Anleitung mit allen paste-fertigen Formulartexten steht in
+[store/PUBLISHING.md](store/PUBLISHING.md). Zwei Punkte betreffen ausgerechnet
+diese Erweiterung und sollten vor dem Einreichen gelesen sein:
+
+1. **Ohne Server und Token tut die Erweiterung nichts.** Ein Prüfer, der das
+   nicht überbrücken kann, hat keinen Grund anzunehmen, dass sie funktioniert.
+   Die Testanleitung ist deshalb der wichtigste Text der Einreichung — siehe
+   [store/test-instructions.md](store/test-instructions.md).
+2. **`https://*/*` unter `optional_host_permissions` verlängert die Prüfung.**
+   Unvermeidbar bei einer selbst gehosteten App, aber die Begründung muss
+   vollständig ins Formular — sie steht ausformuliert in
+   [store/listing-de.md](store/listing-de.md).
+
+Die Datenschutzerklärung liegt fertig in
+[store/privacy-policy.de.md](store/privacy-policy.de.md) und
+[store/privacy-policy.en.md](store/privacy-policy.en.md); sie muss unter einer
+öffentlichen URL erreichbar sein, sonst nimmt der Store die Einreichung nicht an.
+
+Wenn du die Erweiterung nur auf einem Rechner benutzt, brauchst du den Store
+nicht: „Entpackte Erweiterung laden" funktioniert dauerhaft. Der Store bringt
+automatische Updates und die Installation per Klick auf weiteren Geräten.

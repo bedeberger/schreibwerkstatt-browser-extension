@@ -1,4 +1,41 @@
+# Abhaengigkeiten und Build-Artefakte
 node_modules/
 dist/
 *.zip
+*.crx
+web-ext-artifacts/
+coverage/
+.cache/
+
+# Test-Ausgaben
+test-results/
+playwright-report/
+test/.tmp/
+
+# Geheimnisse — nie ins oeffentliche Repo
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+secrets.json
+
+# Editor und Werkzeuge
+.vscode/
+.idea/
+*.swp
+*~
+.claude/settings.local.json
+.claude/worktrees/
+
+# Betriebssystem
 .DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Store-Artefakte: reproduzierbar mit `npm run package` bzw. `npm run promo`
+store/assets/

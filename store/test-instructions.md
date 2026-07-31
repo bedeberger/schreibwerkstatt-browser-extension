@@ -8,75 +8,86 @@ ohne Server und Token **funktionslos**. Ein Prüfer, der das Popup öffnet und n
 überhaupt etwas tut — und „funktioniert nicht wie beschrieben" ist ein
 Ablehnungsgrund.
 
-Drei Wege, in dieser Rangfolge:
+---
 
-| | Weg | Urteil |
-|---|---|---|
-| **A** | [Referenz-Server für die Prüfdauer](#variante-a--referenz-server-empfehlung) | ✅ **Empfehlung** |
-| **B** | [Token auf der Produktion](#variante-b--produktions-token-nicht-empfohlen) | ⚠️ nur im Notfall |
-| **C** | [Gar kein Server](#variante-c--ohne-server) | ❌ letzter Ausweg |
+## Werte für die Einreichung
+
+**Hier eintragen, was die Demo-Instanz seedet.** Alles weiter unten verweist auf
+diese Tabelle, damit die Werte nur an einer Stelle stehen.
+
+| | Wert |
+|---|---|
+| Adresse | `<DEMO-URL>` — z. B. `https://demo.schreibwerkstatt.example.org` |
+| Gerätetoken | `<DEMO-TOKEN>` — beginnt mit `swd_`, braucht die Erfassungs-Berechtigung |
+| Zielbuch | `<DEMO-BUCH>` — der Name, wie er im Popup in der Auswahl steht |
+
+> Das Feld „Testanleitung" ist ein Prüf-Feld: es erscheint **nicht** im
+> öffentlichen Store-Eintrag, nur die Prüfung sieht es. Das Token wird damit
+> nicht der Allgemeinheit bekannt — es sollte aber trotzdem eines sein, das du
+> ohne Bauchschmerzen widerrufen kannst.
 
 ---
 
-## Variante A — Referenz-Server (Empfehlung)
+## Was die Demo-Instanz mitbringen sollte
 
-Der Vertrag, gegen den `test/integration.test.js` prüft, ist vollständig
-implementiert und liegt schon im Repo. `tools/review-server.mjs` bietet ihn
-öffentlich an, mit Beispieldaten statt echter:
+Damit die Prüfung glatt läuft und nichts durchsickert:
 
-```bash
-REVIEW_TOKEN=swd_pruefung_$(openssl rand -hex 12) PORT=8787 npm run review-server
-```
+- **Mindestens ein Buch mit `owner`- oder `editor`-Rolle**, in das der Prüfer
+  erfassen kann. Sonst kommt er über den Verbindungstest nicht hinaus.
+- **Ein Buch mit `viewer`-Rolle**, z. B. „Fremdes Buch". Nice to have: damit
+  lässt sich der Fehlerpfad `BOOK_ACCESS_DENIED` vorführen, und dass die
+  Erweiterung Fehler sauber benennt statt stillschweigend zu scheitern, ist ein
+  gutes Argument. Wenn du es seedest, Abschnitt C im Formulartext drinlassen,
+  sonst streichen.
+- **Keine echten E-Mail-Adressen im Seed.** `GET /content/books` gibt zu jedem
+  Buch die `owner_email` heraus, und der Prüfer sieht die Antwort. Nimm
+  `example.org`-Adressen — nicht deine, und erst recht nicht die von
+  Mitarbeitenden.
+- **Ein Token, das nicht abläuft** oder das mindestens mehrere Wochen gültig
+  bleibt. Die Prüfung kann Wochen dauern; läuft das Token mitten darin aus, sieht
+  der Prüfer eine Erweiterung, die sich nicht verbinden kann.
+- **Regelmäßiges Zurücksetzen der Demo-Daten**, z. B. per Cron nächtlich. Der
+  Prüfer legt Einträge an, der API-Vertrag kennt kein `DELETE /research/:id`, und
+  bei einer Nachbesserung oder einem späteren Update kommt die nächste Runde.
+  Eine Instanz, die sich selbst aufräumt, bleibt über Monate vorzeigbar.
+- **HTTPS.** Die Options-Seite warnt bei einer nicht-lokalen `http`-Adresse, und
+  eine Warnung im Einrichtungsdialog ist das Letzte, was ein Prüfer sehen soll.
 
-Der Server hält seinen Zustand nur im Arbeitsspeicher, schreibt nichts auf Platte
-und greift auf nichts Echtes zu. Nach der Prüfung Prozess beenden — fertig.
-Nichts wegzuräumen, kein Token zu widerrufen.
+Wenn die Demo-Instanz erst später steht: [Variante B](#variante-b--referenz-server-aus-diesem-repo)
+überbrückt das ohne Mutterprojekt.
 
-Er protokolliert jede Anfrage. Daran siehst du nebenbei, ob der Prüfer die
-Erweiterung wirklich ausprobiert hat.
+---
 
-**Zwei Voraussetzungen:**
+## Variante A — Demo-Instanz (Empfehlung)
 
-1. **HTTPS.** Die Options-Seite warnt bei einer nicht-lokalen `http`-Adresse, und
-   eine Warnung im Einrichtungsdialog ist das Letzte, was ein Prüfer sehen soll.
-   Also hinter deinen bestehenden Reverse-Proxy mit Zertifikat, z. B. als
-   `https://cws-review.<deine-domain>` oder als Unterpfad — die Erweiterung kann
-   beides. Du betreibst die Schreibwerkstatt schon selbst, die Infrastruktur ist
-   also da; es ist ein Server-Block, kein neues Hosting.
-2. **Erreichbar bleiben, bis die Prüfung durch ist.** Das können Wochen sein.
-   Lauf ihn unter systemd oder in einem Container, nicht in einem Terminal, das
-   irgendwann zugeht.
+Der Prüfer bedient die echte Anwendung. Kein Vorbehalt im Text nötig, kein Bezug
+auf Testdoubles — das ist der glatteste Weg durch die Prüfung.
 
-Was der Prüfer zu sehen bekommt: drei Bücher — *Nordlicht* (owner), *Mitschrift*
-(editor) und *Fremdes Buch* (viewer, liefert absichtlich `BOOK_ACCESS_DENIED`,
-damit auch die Fehlerbehandlung sichtbar wird). Erfassen, Zitate, DOI-Lookup,
-Anhänge und Warteschlange funktionieren vollständig.
-
-### Text für das Formular
+Vor dem Einreichen die drei Platzhalter aus
+[der Tabelle oben](#werte-für-die-einreichung) einsetzen und die Einrichtung
+**einmal selbst wie ein Prüfer durchklicken**, in einem frischen Chrome-Profil
+ohne deine bestehende Konfiguration.
 
 ```
 Schreibwerkstatt is a self-hosted writing app; this extension is its browser
 companion and has no bundled backend. It cannot be exercised without a server,
-so I have deployed a reference implementation of that server's REST API for the
-duration of this review. It serves sample data — it is not a production system
-and contains no real user content. Its source is in the repository at
-tools/review-server.mjs and test/helpers/mock-server.js, so you can verify that
-the extension speaks exactly the documented contract.
+so I have set up a demo instance for this review. It holds sample data only —
+no real user content.
 
 SETUP (about one minute)
 
 1. Right-click the extension icon and choose "Options" (the options page also
    opens from the gear icon in the popup).
-2. Server address:  <REVIEW-SERVER-URL EINTRAGEN, z. B. https://cws-review.example.org>
-   Device token:    <REVIEW_TOKEN EINTRAGEN, beginnt mit swd_>
+2. Server address:  <DEMO-URL>
+   Device token:    <DEMO-TOKEN>
 3. Click "Save".
 4. Click "Grant access to this host". Chrome will ask for the host permission
    for this single origin. This is expected and required — see the host
    permission justification. The manifest deliberately contains no <all_urls>;
    the address of a self-hosted app differs per user and cannot be declared in
    the manifest, so it is requested at runtime for exactly one origin.
-5. Click "Test connection". Three sample books load.
-6. Pick "Nordlicht" as the default book.
+5. Click "Test connection". The demo instance's books load.
+6. Pick "<DEMO-BUCH>" as the default book.
 
 WHAT TO TEST
 
@@ -93,8 +104,8 @@ B) Capture a quote
    is only sent after the undo window closes.
 
 C) Error handling
-   Capture into the book "Fremdes Buch". The server refuses it (the account has
-   viewer access only) and the extension reports precisely why, naming the
+   Capture into the book "Fremdes Buch". The account has viewer access only, so
+   the server refuses it and the extension reports precisely why, naming the
    error code, instead of failing silently.
 
 D) Offline queue (optional)
@@ -117,58 +128,74 @@ NOTES FOR REVIEW
 Contact for questions during review: bede.berger@gmail.com
 ```
 
+> Kein `viewer`-Buch geseedet? Dann Abschnitt C streichen. Etwas anzukündigen,
+> was der Prüfer nicht vorfindet, ist schlimmer als es weglassen.
+
 ---
 
-## Variante B — Produktions-Token (nicht empfohlen)
+## Variante B — Referenz-Server aus diesem Repo
 
-Nur, wenn A aus irgendeinem Grund nicht geht. Was du dabei in Kauf nimmst:
+Falls die Demo-Instanz noch nicht steht oder ausfällt. Braucht das Mutterprojekt
+nicht:
 
-- **`GET /content/books` gibt alles heraus.** Nicht nur die Titel aller deiner
-  Buchprojekte, sondern auch die `owner_email` der jeweiligen Eigentümer. Bei
-  gemeinsam bearbeiteten Büchern gibst du damit **E-Mail-Adressen anderer Leute**
-  an einen Google-Prüfer weiter, die dir dafür keine Erlaubnis gegeben haben.
-  Das ist der Grund, aus dem diese Variante nicht die erste ist.
-- **Die Testeinträge bleiben.** Der API-Vertrag kennt kein
-  `DELETE /research/:id`; du räumst sie in der Web-App von Hand weg.
-- **Das Token muss danach widerrufen werden**, und es muss die ganze Prüfung
-  über gültig bleiben — das können Wochen sein.
+```bash
+REVIEW_TOKEN=swd_pruefung_$(openssl rand -hex 12) PORT=8787 npm run review-server
+```
 
-Wenn es dabei bleiben soll, dann wenigstens so:
+[../tools/review-server.mjs](../tools/review-server.mjs) bietet denselben
+API-Vertrag an, gegen den `test/integration.test.js` prüft — Zustand nur im
+Arbeitsspeicher, kein Plattenzugriff, kein Bezug zu echten Daten. Er liefert
+*Nordlicht* (owner), *Mitschrift* (editor) und *Fremdes Buch* (viewer, gibt
+absichtlich `BOOK_ACCESS_DENIED`), protokolliert jede Anfrage und ist nach
+Strg+C restlos weg. Braucht ebenfalls HTTPS über deinen Reverse-Proxy.
 
-1. Ein **eigenes Buch** anlegen, z. B. „Chrome Web Store — Prüfung", und es in
-   der Anleitung ausdrücklich als Ziel nennen.
-2. Ein **frisches Gerätetoken** nur für die Prüfung erzeugen, nicht dein eigenes
-   benutzen.
-3. Nach der Freigabe: Token widerrufen, Testeinträge löschen.
-
-Den Formulartext aus Variante A übernehmen, aber den ersten Absatz ersetzen:
+Formulartext aus Variante A übernehmen, aber den ersten Absatz ersetzen — hier
+ist der Vorbehalt Pflicht, weil es *nicht* die echte Anwendung ist:
 
 ```
 Schreibwerkstatt is a self-hosted writing app; this extension is its browser
 companion and has no bundled backend. It cannot be exercised without a server,
-so please use the instance and token below. Please capture into the book
-"Chrome Web Store — Prüfung", which exists for this review.
+so I have deployed a reference implementation of that server's REST API for the
+duration of this review. It serves sample data — it is not a production system
+and contains no real user content. Its source is in the repository at
+tools/review-server.mjs and test/helpers/mock-server.js, so you can verify that
+the extension speaks exactly the documented contract.
 ```
 
-Und in Schritt 6 „Nordlicht" durch „Chrome Web Store — Prüfung" ersetzen sowie
-Abschnitt C streichen — den Fehlerpfad kannst du auf der Produktion nicht
-vorführen.
+In Schritt 6 „Nordlicht" als Zielbuch nennen.
 
 ---
 
-## Variante C — ohne Server
+## Variante C — Produktions-Token
 
-Dem Prüfer fehlt dann jede Möglichkeit, die Erweiterung zu bedienen. Das erhöht
-das Ablehnungsrisiko deutlich. Nicht hoffnungslos, wenn du es offen sagst und den
-Rest so nachvollziehbar wie möglich machst — aber nimm das nur, wenn A und B
-beide ausfallen.
+**Nicht nehmen.** Steht hier nur, damit die Begründung dokumentiert ist:
+
+- `GET /content/books` gibt die Titel **aller** deiner Buchprojekte heraus und
+  dazu die `owner_email` der Eigentümer. Bei gemeinsam bearbeiteten Büchern
+  gehen damit E-Mail-Adressen anderer Leute an einen Google-Prüfer, die dir das
+  nicht erlaubt haben.
+- Der API-Vertrag kennt kein `DELETE /research/:id`. Die Testeinträge des
+  Prüfers räumst du in der Web-App von Hand weg.
+- Der Fehlerpfad aus Abschnitt C lässt sich nicht vorführen, ohne dir selbst ein
+  Buch zu entziehen.
+
+Variante A und B leisten dasselbe ohne all das.
+
+---
+
+## Variante D — ohne Server
+
+Letzter Ausweg. Dem Prüfer fehlt jede Möglichkeit, die Erweiterung zu bedienen;
+das Ablehnungsrisiko steigt deutlich. Nicht hoffnungslos, wenn du es offen sagst
+und den Rest so nachvollziehbar wie möglich machst.
 
 ```
 This extension is a companion to a self-hosted web app ("Schreibwerkstatt")
 that the user installs on their own server. It has no bundled backend and no
 default server address, and it therefore cannot be exercised end to end
 without such an installation. I am unfortunately not able to provide a public
-test instance. Everything that can be verified without one is listed below.
+test instance at the moment. Everything that can be verified without one is
+listed below.
 
 WHAT CAN BE VERIFIED WITHOUT A SERVER
 
@@ -192,8 +219,8 @@ WHAT CAN BE VERIFIED WITHOUT A SERVER
    its Undo button appears. Sending fails against a non-existent host, and the
    item is placed in the visible retry queue instead of being dropped.
 
-If it would help the review, I can stand up a reference implementation of the
-server API on request — please just ask.
+If it would help the review, I can stand up a demo instance of the server on
+request — please just ask.
 
 NOTES FOR REVIEW
 
@@ -214,15 +241,14 @@ Contact: bede.berger@gmail.com
 
 ---
 
-## Vor dem Absenden ersetzen
+## Vor dem Absenden
 
-Repository-URL und Kontaktadresse sind eingesetzt. Bei Variante A bleiben zwei
-Werte:
-
-- `<REVIEW-SERVER-URL EINTRAGEN, z. B. https://cws-review.example.org>`
-- `<REVIEW_TOKEN EINTRAGEN, beginnt mit swd_>` — dasselbe, das der Server beim
-  Start ausgibt
-
-Und daran denken: Adresse und Token müssen die ganze Prüfung über funktionieren.
-Die kann Wochen dauern; fällt der Server mittendrin aus, sieht der Prüfer eine
-Erweiterung, die sich nicht verbinden kann.
+- [ ] `<DEMO-URL>`, `<DEMO-TOKEN>` und `<DEMO-BUCH>` in
+      [der Tabelle oben](#werte-für-die-einreichung) und im Formulartext ersetzt
+- [ ] Demo-Instanz über **HTTPS** erreichbar, Zertifikat gültig
+- [ ] Seed enthält keine echten E-Mail-Adressen
+- [ ] Token hat die Erfassungs-Berechtigung und läuft nicht in den nächsten
+      Wochen ab
+- [ ] Abschnitt C passt zum Seed — `viewer`-Buch vorhanden oder Abschnitt raus
+- [ ] Einrichtung in einem **frischen Chrome-Profil** einmal selbst
+      durchgeklickt, so wie der Prüfer sie vorfindet

@@ -448,13 +448,14 @@ diese Erweiterung und sollten vor dem Einreichen gelesen sein:
 
 1. **Ohne Server und Token tut die Erweiterung nichts.** Ein Prüfer, der das
    nicht überbrücken kann, hat keinen Grund anzunehmen, dass sie funktioniert.
-   Dafür gibt es `npm run review-server`
-   ([tools/review-server.mjs](tools/review-server.mjs)): derselbe API-Vertrag,
-   gegen den `test/integration.test.js` prüft, mit Beispieldaten im
-   Arbeitsspeicher, öffentlich anzubieten für die Dauer der Prüfung. **Nicht die
-   Produktion hernehmen** — `GET /content/books` gibt die Titel aller
-   Buchprojekte und die `owner_email` ihrer Eigentümer heraus. Die drei Wege
-   samt Formulartexten: [store/test-instructions.md](store/test-instructions.md).
+   Vorgesehener Weg: eine **Demo-Instanz** der Schreibwerkstatt mit geseedeten
+   Büchern und Token, deren Werte in die Testanleitung wandern. Wichtig beim
+   Seed: keine echten E-Mail-Adressen, denn `GET /content/books` gibt zu jedem
+   Buch die `owner_email` heraus. Steht die Instanz noch nicht, überbrückt
+   `npm run review-server` ([tools/review-server.mjs](tools/review-server.mjs))
+   das ohne Mutterprojekt — derselbe API-Vertrag, gegen den
+   `test/integration.test.js` prüft. Alle Varianten samt Formulartexten:
+   [store/test-instructions.md](store/test-instructions.md).
 2. **`https://*/*` unter `optional_host_permissions` verlängert die Prüfung.**
    Unvermeidbar bei einer selbst gehosteten App, aber die Begründung muss
    vollständig ins Formular — sie steht ausformuliert in

@@ -40,30 +40,32 @@ Ohne Schreibwerkstatt-Server und Gerätetoken tut die Erweiterung nichts. Wer da
 Popup öffnet, sieht „Nicht verbunden" — und eine Erweiterung, die nicht tut, was
 ihre Beschreibung ankündigt, wird abgelehnt.
 
-**Das ist das größte Risiko dieser Einreichung, und es ist auflösbar** — ohne
-dass du dafür eine Demo-Instanz der Schreibwerkstatt aufsetzen müsstest:
+**Das ist das größte Risiko dieser Einreichung, und der Plan dagegen steht:** eine
+**Demo-Instanz** der Schreibwerkstatt im Mutterprojekt, mit geseedeten Büchern
+und einem Gerätetoken, deren Werte in die Testanleitung wandern. Damit bedient
+der Prüfer die echte Anwendung — der glatteste Weg durch die Prüfung, weil der
+Formulartext dann keinen Vorbehalt braucht.
 
-```bash
-REVIEW_TOKEN=swd_pruefung_$(openssl rand -hex 12) PORT=8787 npm run review-server
-```
+Worauf beim Seed zu achten ist (Details in
+[test-instructions.md](test-instructions.md#was-die-demo-instanz-mitbringen-sollte)):
+mindestens ein beschreibbares Buch, **keine echten E-Mail-Adressen** — denn
+`GET /content/books` gibt zu jedem Buch die `owner_email` heraus und der Prüfer
+sieht die Antwort —, ein Token mit Erfassungs-Berechtigung, das nicht in den
+nächsten Wochen abläuft, HTTPS, und ein nächtliches Zurücksetzen der Demo-Daten.
+Letzteres, weil der API-Vertrag kein `DELETE /research/:id` kennt und die
+Einträge des Prüfers sonst liegenbleiben.
 
+Falls die Demo-Instanz noch nicht steht, überbrückt
+`npm run review-server` das ohne Mutterprojekt —
 [tools/review-server.mjs](../tools/review-server.mjs) bietet denselben
-API-Vertrag an, gegen den auch `test/integration.test.js` prüft — mit
-Beispieldaten, im Arbeitsspeicher, ohne Zugriff auf irgendetwas Echtes. Der
-Prüfer bekommt drei Bücher, kann erfassen, zitieren, nachschlagen und sogar den
-Fehlerpfad sehen. Danach: Prozess beenden. Nichts wegzuräumen, kein Token zu
-widerrufen.
+API-Vertrag an, gegen den `test/integration.test.js` prüft. Das ist Variante B;
+sie braucht im Formulartext einen Vorbehalt, weil es nicht die echte Anwendung
+ist.
 
-Nötig ist nur, dass er über **HTTPS** erreichbar ist und bis zum Abschluss der
-Prüfung läuft — ein Server-Block hinter deinem bestehenden Reverse-Proxy, kein
-neues Hosting.
-
-**Nimm dafür nicht die Produktion.** `GET /content/books` gibt die Titel aller
-deiner Buchprojekte und die `owner_email` der Eigentümer heraus — bei gemeinsam
-bearbeiteten Büchern also E-Mail-Adressen anderer Leute. Dazu kennt der
-API-Vertrag kein `DELETE /research/:id`, die Testeinträge des Prüfers bleiben
-also stehen. Alle drei Wege samt Formulartexten stehen in
-[test-instructions.md](test-instructions.md).
+**Die Produktion ist der falsche Weg**, auch mit eigenem Token: sie leakt die
+Titel aller Buchprojekte samt `owner_email` der Eigentümer, und die Testeinträge
+des Prüfers musst du von Hand wegräumen. Begründung ausgeschrieben unter
+[Variante C](test-instructions.md#variante-c--produktions-token).
 
 ### Das weite Host-Muster fällt auf
 
@@ -361,8 +363,9 @@ auslassen — eine leere Zeile ist ein Ablehnungsgrund.
 **Vertrieb** — nicht aufgeführt, kostenlos, alle Regionen.
 
 **Testanleitung** — aus [test-instructions.md](test-instructions.md),
-Variante A. Nicht leer lassen, und vorher den Referenz-Server starten: die
-Adresse im Formular muss in dem Moment funktionieren, in dem du einreichst.
+Variante A. Nicht leer lassen, und vorher prüfen, dass die Demo-Instanz läuft:
+Adresse und Token müssen in dem Moment funktionieren, in dem du einreichst, und
+danach bis zum Abschluss weiter.
 
 Dann **Zur Prüfung einreichen**. Zur Wahl steht außerdem, nach der Freigabe
 nicht automatisch, sondern von Hand zu veröffentlichen — das Zeitfenster dafür
@@ -439,10 +442,13 @@ Vor dem Einreichen:
 - [ ] `npm run package` erzeugt das ZIP, SHA-256 notiert
 - [ ] Stand nach `main` gepusht, damit die Datenschutz-URL den fertigen Text zeigt
 - [ ] Datenschutz-URL in einem abgemeldeten Browserfenster aufgerufen
-- [ ] Referenz-Server läuft über HTTPS und übersteht einen Neustart
-      (systemd o. ä., nicht in einem offenen Terminal)
-- [ ] Testanleitung ausgefüllt: Adresse und `REVIEW_TOKEN` eingesetzt,
-      Einrichtung einmal selbst durchgeklickt wie ein Prüfer
+- [ ] Demo-Instanz steht, über HTTPS erreichbar, Seed ohne echte
+      E-Mail-Adressen, Token läuft nicht in den nächsten Wochen ab
+- [ ] Testanleitung ausgefüllt: `<DEMO-URL>`, `<DEMO-TOKEN>` und `<DEMO-BUCH>`
+      eingesetzt — Restliste in
+      [test-instructions.md](test-instructions.md#vor-dem-absenden)
+- [ ] Einrichtung in einem frischen Chrome-Profil einmal selbst durchgeklickt,
+      so wie der Prüfer sie vorfindet
 - [ ] `npm run promo` gelaufen, beide Kacheln vorhanden
 - [ ] mindestens ein Screenshot in genau 1280 × 800, mit `file` geprüft
 - [ ] Begründung für jede der sechs Berechtigungen **und** für die

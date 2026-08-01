@@ -450,7 +450,7 @@
     "message": "That is not a valid http(s) address."
   },
   "options_server_url_insecure": {
-    "message": "Without TLS the token travels in the clear. Only sensible locally."
+    "message": "Without TLS the token travels in the clear. http is therefore limited to localhost and 127.0.0.1 — use https for anything else."
   },
   "options_server_url_normalized": {
     "message": "Will be used as: $1"
@@ -499,6 +499,9 @@
   },
   "options_test_ok": {
     "message": "Connection works. Found $1 books."
+  },
+  "options_test_ok_one": {
+    "message": "Connection works. Found one book."
   },
   "options_section_books": {
     "message": "2. Default book"

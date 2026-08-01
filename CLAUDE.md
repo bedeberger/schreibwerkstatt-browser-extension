@@ -12,6 +12,8 @@ npm run build     # dist/ erzeugen (unmittelbar in chrome://extensions ladbar)
 npm run watch     # dist/ beobachten
 npm test          # alle Tests, kein Netz und kein Server nötig
 npm run icons     # Symbole neu erzeugen
+npm run promo     # Werbekacheln für den Store
+npm run shots     # Store-Screenshots (braucht SHOTS_TOKEN, siehe store/PUBLISHING.md)
 npm run clean     # dist/ löschen
 ```
 

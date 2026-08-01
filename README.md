@@ -164,7 +164,12 @@ Im Manifest steht **keine** feste `host_permissions` und insbesondere kein
 `<all_urls>`. Stattdessen:
 
 ```json
-"optional_host_permissions": ["https://*/*", "http://*/*"]
+"optional_host_permissions": [
+  "https://*/*",
+  "http://localhost/*",
+  "http://127.0.0.1/*",
+  "http://*.localhost/*"
+]
 ```
 
 Das ist eine *Erlaubnis zu fragen*, keine erteilte Berechtigung. Beim Einrichten
@@ -174,9 +179,12 @@ Nur dieses Origin wird gewährt. Der Umweg ist nötig, weil der Host bei einer
 selbst gehosteten App pro Nutzer verschieden ist und deshalb nicht im Manifest
 stehen kann.
 
-`http://*/*` ist enthalten, damit eine lokale Entwicklungsinstanz
-(`http://localhost:3000`) funktioniert. Die Options-Seite warnt, wenn du eine
-`http`-Adresse einträgst, die nicht lokal ist.
+Die `http`-Muster sind bewusst auf localhost verengt: sie sind nur da, damit eine
+lokale Entwicklungsinstanz (`http://localhost:3000`) funktioniert. Eine
+`http`-Adresse außerhalb von localhost lehnt die Options-Seite ab statt sie zu
+speichern — anfordern ließe sie sich ohnehin nicht, und ohne TLS ginge das Token
+im Klartext über die Leitung. [test/manifest.test.js](test/manifest.test.js) hält
+beide Seiten zusammen.
 
 Diese Host-Berechtigung befreit den Service Worker außerdem von CORS. Deshalb — und
 nur deshalb — laufen **alle** Netzwerkanfragen im Worker. Aus einem Content-Script
@@ -252,10 +260,11 @@ verwaltest du in der Web-App.
 npm install
 npm run build      # dist/ erzeugen
 npm run watch      # dist/ beobachten (statische Dateien nur beim Start kopiert)
-npm test           # 224 Tests, kein Server nötig
+npm test           # 230 Tests, kein Server nötig
 npm run icons      # Symbole aus tools/make-icons.mjs neu erzeugen
 npm run package    # store-fertiges ZIP unter store/ erzeugen
 npm run promo      # Werbekacheln für den Store rendern (braucht Chrome)
+npm run shots      # Store-Screenshots aufnehmen (SHOTS_TOKEN=… nötig)
 npm run review-server   # Referenz-Server für die Store-Prüfung (REVIEW_TOKEN setzen)
 npm run clean      # dist/ löschen
 ```
@@ -440,6 +449,7 @@ Alles für den Chrome Web Store liegt in [`store/`](store/):
 ```bash
 npm run package    # store/schreibwerkstatt-chrome-<version>.zip
 npm run promo      # store/assets/ — die beiden Werbekacheln
+SHOTS_TOKEN=swd_… npm run shots   # store/assets/ — drei Screenshots in 1280×800
 ```
 
 Die Anleitung mit allen paste-fertigen Formulartexten steht in

@@ -167,13 +167,20 @@ export function normalizeServerUrl(raw) {
 
 /**
  * Ist das ein lokaler Host? Nur fuer die gibt die Options-Seite `http:` frei.
+ *
+ * Die Liste deckt sich absichtlich mit den `http`-Mustern in
+ * `manifest.json` → `optional_host_permissions`: was hier durchgeht, muss
+ * `chrome.permissions.request()` auch gewaehrt bekommen koennen. Deshalb kein
+ * `[::1]` — Chrome-Match-Muster kennen keine IPv6-Literale, ein solches Origin
+ * liesse sich gar nicht anfordern.
+ *
  * @param {unknown} raw
  */
 export function isLocalHost(raw) {
   const url = parse(raw);
   if (!url) return false;
   const host = url.hostname.toLowerCase();
-  return host === 'localhost' || host === '127.0.0.1' || host === '[::1]' || host.endsWith('.localhost');
+  return host === 'localhost' || host === '127.0.0.1' || host.endsWith('.localhost');
 }
 
 /**

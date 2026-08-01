@@ -345,6 +345,17 @@ p {
 
 /* ---------------------------------------------------------------- Hinweise */
 
+/*
+ * `hidden` muss jede eigene `display`-Regel schlagen. Ohne diese Zeile gewinnt
+ * schon `.panel { display: flex }` gegen das `[hidden] { display: none }` des
+ * Browsers — Autorenregeln stehen ueber der UA-Stylesheet-Ebene. Im Popup
+ * standen dadurch Einrichtungs-Hinweis, Token-Panel und „Seite wird
+ * ausgewertet …" dauerhaft im Bild.
+ */
+[hidden] {
+  display: none !important;
+}
+
 .panel {
   display: flex;
   flex-direction: column;

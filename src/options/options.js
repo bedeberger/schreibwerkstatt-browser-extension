@@ -101,7 +101,7 @@ function wireEvents() {
       return;
     }
     // http nur fuer lokale Entwicklung durchgehen lassen.
-    if (normalized.startsWith('http://') && !isLocalHost(normalized)) {
+    if (isBlockedHttp(normalized)) {
       ui.serverUrlHint.textContent = t('options_server_url_insecure');
       return;
     }
@@ -147,6 +147,10 @@ async function saveConnection() {
     showNotice(ui.connectionResult, t('options_server_url_invalid'), 'error');
     return;
   }
+  if (isBlockedHttp(serverUrl)) {
+    showNotice(ui.connectionResult, t('options_server_url_insecure'), 'error');
+    return;
+  }
 
   // Unveraendertes Maskenfeld bedeutet: Token bleibt, wie es ist.
   const token = ui.token.dataset.untouched === 'true' ? '' : ui.token.value.trim();
@@ -161,10 +165,28 @@ async function saveConnection() {
   }
 }
 
+/**
+ * Eine `http`-Adresse ausserhalb von localhost ist keine Warnung, sondern eine
+ * Sackgasse: das Manifest fuehrt unter `optional_host_permissions` nur
+ * das weite https-Muster und die localhost-Muster, ein anderes `http`-Origin
+ * laesst sich gar nicht anfordern. Also hier ablehnen statt spaeter an
+ * `chrome.permissions.request()` scheitern.
+ *
+ * @param {string} normalized bereits durch `normalizeServerUrl` gegangen
+ */
+function isBlockedHttp(normalized) {
+  return normalized.startsWith('http://') && !isLocalHost(normalized);
+}
+
 async function requestPermission() {
   const pattern = toOriginPattern(ui.serverUrl.value);
   if (!pattern) {
     showNotice(ui.connectionResult, t('options_server_url_invalid'), 'error');
+    return;
+  }
+  const normalized = normalizeServerUrl(ui.serverUrl.value);
+  if (normalized && isBlockedHttp(normalized)) {
+    showNotice(ui.connectionResult, t('options_server_url_insecure'), 'error');
     return;
   }
   try {
@@ -202,9 +224,11 @@ async function testConnection() {
   showNotice(ui.connectionResult, t('options_testing'), 'muted');
   try {
     const result = await send(MSG.TEST_CONNECTION);
+    // chrome.i18n kennt keine Pluralregeln — die eine Ausnahme von Hand.
+    const count = result.books.length;
     showNotice(
       ui.connectionResult,
-      t('options_test_ok', [String(result.books.length)]),
+      count === 1 ? t('options_test_ok_one') : t('options_test_ok', [String(count)]),
       'success',
     );
     await reload();

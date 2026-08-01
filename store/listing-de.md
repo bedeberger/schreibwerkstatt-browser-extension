@@ -166,7 +166,7 @@ Zeigt nach dem Erfassen eines Zitats die Bestätigung samt Rückgängig-Knopf. F
 Weckt den Service Worker, wenn eine gescheiterte Erfassung erneut versucht werden soll. Ein MV3-Service-Worker wird nach etwa 30 Sekunden Untätigkeit beendet, und setTimeout hält ihn nicht am Leben; ohne alarms würde ein Eintrag mit zwei Stunden Backoff bis zur nächsten manuellen Aktion liegenbleiben. Erzeugt keinen Netzverkehr und erhebt keine Daten.
 ```
 
-**Host-Berechtigungen (`https://*/*`, `http://*/*` — optional)**
+**Host-Berechtigungen (`https://*/*` sowie die localhost-Muster — optional)**
 ```
 Diese Muster stehen unter optional_host_permissions, nicht unter host_permissions. Sie sind also eine Erlaubnis zu fragen, keine erteilte Berechtigung; das Manifest enthält kein <all_urls>.
 
@@ -174,7 +174,7 @@ Beim Einrichten ruft die Options-Seite chrome.permissions.request() mit genau EI
 
 Der Umweg über ein weites optionales Muster ist unvermeidbar, weil die Schreibwerkstatt selbst gehostet wird: die Adresse ist bei jedem Nutzer eine andere und kann daher nicht im Manifest stehen. Manifest V3 kennt keine Möglichkeit, ein zur Laufzeit bestimmtes Origin anzufordern, das nicht vorab im Manifest deklariert ist.
 
-http://*/* ist enthalten, damit eine lokale Entwicklungsinstanz (etwa http://localhost:3000) funktioniert; die Options-Seite warnt, wenn eine nicht-lokale http-Adresse eingetragen wird.
+Unverschlüsselte Adressen sind bewusst auf die lokale Entwicklung begrenzt: das Manifest führt dafür nur http://localhost/*, http://127.0.0.1/* und http://*.localhost/* — kein weites http-Muster. Eine nicht-lokale http-Adresse lehnt die Options-Seite ab, statt sie zu speichern.
 
 Diese Host-Berechtigung befreit den Service Worker außerdem von CORS. Deshalb — und nur deshalb — laufen alle Netzwerkanfragen im Service Worker und keine im Content-Script.
 ```

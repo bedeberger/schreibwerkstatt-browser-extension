@@ -136,7 +136,11 @@ describe('Kleinkram', () => {
   it('isLocalHost', () => {
     assert.equal(isLocalHost('http://localhost:3000'), true);
     assert.equal(isLocalHost('http://127.0.0.1'), true);
+    assert.equal(isLocalHost('http://werkstatt.localhost'), true);
     assert.equal(isLocalHost('https://example.org'), false);
+    // Kein Match-Muster im Manifest kann ein IPv6-Literal abdecken; was sich
+    // nicht anfordern laesst, gilt hier auch nicht als lokal.
+    assert.equal(isLocalHost('http://[::1]:3000'), false);
   });
 
   it('hostLabel entfernt www.', () => {

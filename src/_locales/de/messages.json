@@ -450,7 +450,7 @@
     "message": "Das ist keine gültige http(s)-Adresse."
   },
   "options_server_url_insecure": {
-    "message": "Ohne TLS geht das Token im Klartext über die Leitung. Nur lokal sinnvoll."
+    "message": "Ohne TLS geht das Token im Klartext über die Leitung. http ist deshalb nur für localhost und 127.0.0.1 möglich — für alles andere https."
   },
   "options_server_url_normalized": {
     "message": "Wird verwendet als: $1"
@@ -499,6 +499,9 @@
   },
   "options_test_ok": {
     "message": "Verbindung steht. $1 Bücher gefunden."
+  },
+  "options_test_ok_one": {
+    "message": "Verbindung steht. Ein Buch gefunden."
   },
   "options_section_books": {
     "message": "2. Standardbuch"

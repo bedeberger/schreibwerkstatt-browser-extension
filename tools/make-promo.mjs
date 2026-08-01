@@ -19,13 +19,11 @@
  * Oberfläche zeigen. Siehe store/PUBLISHING.md.
  */
 
-import { execFile } from 'node:child_process';
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { promisify } from 'node:util';
 
-const run = promisify(execFile);
+import { findChrome, headlessScreenshot, pngSize } from './lib/chrome.mjs';
 
 const ROOT = dirname(fileURLToPath(import.meta.url)).replace(/\/tools$/, '');
 const OUT_DIR = join(ROOT, 'store', 'assets');
@@ -34,14 +32,6 @@ const TMP_DIR = join(OUT_DIR, '.tmp');
 const INK = '#22405f';
 const PAPER = '#ffffff';
 const ACCENT = '#d98324';
-
-const CHROME_CANDIDATES = [
-  process.env.CHROME_PATH,
-  'google-chrome',
-  'google-chrome-stable',
-  'chromium',
-  'chromium-browser',
-].filter(Boolean);
 
 /**
  * Das Icon-Motiv als SVG, in denselben Proportionen wie in `make-icons.mjs`:
@@ -147,35 +137,21 @@ const TILES = [
   },
 ];
 
-/** @returns {Promise<string>} Pfad zu einer lauffähigen Chrome-Binärdatei */
-async function findChrome() {
-  for (const candidate of CHROME_CANDIDATES) {
-    try {
-      await run(candidate, ['--version']);
-      return candidate;
-    } catch {
-      // weiter
-    }
-  }
+let chrome;
+try {
+  chrome = await findChrome();
+} catch (error) {
+  process.stderr.write(`${error.message}\n`);
   process.stderr.write([
-    '',
-    'FEHLER: Kein Chrome gefunden.',
-    '',
-    'Die Kacheln werden mit dem installierten Chrome im Headless-Modus',
-    'gerendert. Setze CHROME_PATH, falls die Binärdatei anders heißt:',
-    '',
-    '  CHROME_PATH=/pfad/zu/chrome npm run promo',
-    '',
     'Alternativ die HTML-Dateien unter store/assets/.tmp/ selbst im Browser',
     'öffnen und bei genau der angegebenen Fenstergröße abfotografieren.',
+    '',
     '',
   ].join('\n'));
   process.exit(1);
 }
 
-const chrome = await findChrome();
-
-await rm(TMP_DIR, { recursive: true, force: true });
+await rm(TMP_DIR, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
 await mkdir(TMP_DIR, { recursive: true });
 
 for (const tile of TILES) {
@@ -183,25 +159,18 @@ for (const tile of TILES) {
   const outFile = join(OUT_DIR, tile.file);
   await writeFile(htmlFile, tile.html, 'utf8');
 
-  await run(chrome, [
-    '--headless',
-    '--disable-gpu',
-    // Kein Netz: die Kacheln dürfen nichts nachladen.
-    '--disable-extensions',
-    '--hide-scrollbars',
-    '--force-device-scale-factor=1',
-    `--window-size=${tile.width},${tile.height}`,
-    `--screenshot=${outFile}`,
-    `--user-data-dir=${join(TMP_DIR, 'profile')}`,
-    `file://${htmlFile}`,
-  ]);
+  // Kein Netz: die Kacheln dürfen nichts nachladen.
+  await headlessScreenshot({
+    chrome,
+    url: `file://${htmlFile}`,
+    out: outFile,
+    width: tile.width,
+    height: tile.height,
+    profileDir: join(TMP_DIR, 'profile'),
+  });
 
-  // Maße aus dem PNG-IHDR-Chunk nachprüfen: Chrome liefert bei falschem
-  // Skalierungsfaktor sonst stillschweigend die doppelte Kantenlänge, und der
-  // Store weist das ohne brauchbare Meldung ab.
   const png = await readFile(outFile);
-  const width = png.readUInt32BE(16);
-  const height = png.readUInt32BE(20);
+  const { width, height } = pngSize(png);
   if (width !== tile.width || height !== tile.height) {
     process.stderr.write(`\nFEHLER: ${tile.file} ist ${width}x${height}, erwartet ${tile.width}x${tile.height}.\n\n`);
     process.exit(1);
@@ -210,6 +179,6 @@ for (const tile of TILES) {
   process.stdout.write(`${relative(ROOT, outFile)}  ${width}x${height}  ${(png.length / 1024).toFixed(1)} KiB\n`);
 }
 
-await rm(TMP_DIR, { recursive: true, force: true });
+await rm(TMP_DIR, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
 
 process.stdout.write('\nDie Screenshots (1280x800) fehlen noch — siehe store/PUBLISHING.md.\n');

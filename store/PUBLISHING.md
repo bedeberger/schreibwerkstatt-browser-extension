@@ -9,7 +9,7 @@ sind zum Kopieren geschrieben, nicht zum Umschreiben.
 | [listing-en.md](listing-en.md) | dieselben Texte für die zweite Sprache des Eintrags |
 | [privacy-policy.de.md](privacy-policy.de.md) · [privacy-policy.en.md](privacy-policy.en.md) | die Datenschutzerklärung, die unter einer öffentlichen URL stehen muss |
 | [test-instructions.md](test-instructions.md) | Anleitung für den Prüfer — der wichtigste Text der Einreichung |
-| `assets/` | die Werbekacheln, erzeugt mit `npm run promo` |
+| `assets/` | Werbekacheln (`npm run promo`) und Screenshots (`npm run shots`) |
 
 **Vorher lesen:** [Zwei Dinge, die hier schiefgehen können](#zwei-dinge-die-hier-schiefgehen-können).
 Beide betreffen genau diese Erweiterung und nicht Erweiterungen im Allgemeinen.
@@ -72,7 +72,12 @@ des Prüfers musst du von Hand wegräumen. Begründung ausgeschrieben unter
 Im Manifest steht:
 
 ```json
-"optional_host_permissions": ["https://*/*", "http://*/*"]
+"optional_host_permissions": [
+  "https://*/*",
+  "http://localhost/*",
+  "http://127.0.0.1/*",
+  "http://*.localhost/*"
+]
 ```
 
 `https://*/*` steht auf der Liste der Muster, die Google ausdrücklich genauer
@@ -82,25 +87,25 @@ Unterschied, aber niemand sieht ihn, wenn er nicht dasteht. Die
 Berechtigungsbegründung in [listing-de.md](listing-de.md#begründung-je-berechtigung)
 erklärt es; kopiere sie vollständig, nicht gekürzt.
 
-**Optional, aber es hilft:** `http://*/*` ist im Manifest nur da, damit eine
-lokale Entwicklungsinstanz funktioniert. Diesen Teil kannst du auf localhost
-verengen:
+**Das weite `http://*/*` ist bereits entfernt.** Es war nur für eine lokale
+Entwicklungsinstanz da; jetzt stehen dort ausschließlich localhost-Muster. Damit
+lässt sich keine unverschlüsselte Adresse außerhalb von localhost mehr eintragen
+— kein `http://192.168.1.20:3000`, kein `http://dev.intern`. Die Options-Seite
+**lehnt** eine solche Adresse ab, statt sie nur zu bemängeln; sie ließe sich
+ohnehin nicht anfordern. [test/manifest.test.js](../test/manifest.test.js) hält
+Manifest und Options-Logik zusammen.
 
-```diff
-   "optional_host_permissions": [
-     "https://*/*",
--    "http://*/*"
-+    "http://localhost/*",
-+    "http://127.0.0.1/*"
-   ],
-```
-
-Danach lässt sich keine unverschlüsselte Adresse außerhalb von localhost mehr
-eintragen — also kein `http://192.168.1.20:3000` und kein `http://dev.intern`.
-Ob dir das etwas nimmt, weißt du selbst; sicherheitstechnisch ist es ein Gewinn,
-und es entfernt ein Muster aus dem Blickfeld der Prüfung. Wenn du es machst:
-`npm test` läuft danach durch, aber prüfe die Warnlogik der Options-Seite
-für `http`-Adressen von Hand nach.
+> In einem echten Chrome 150 nachgemessen: für `https://…`,
+> `http://localhost:3000`, `http://127.0.0.1:8080` und
+> `http://werkstatt.localhost` erscheint der Berechtigungsdialog;
+> `http://192.168.1.20:3000` und `http://dev.intern` weist Chrome selbst ab
+> („Only permissions specified in the manifest may be requested"). Die
+> Options-Seite fängt diesen Fall schon vorher ab, damit niemand diese Meldung
+> zu sehen bekommt.
+>
+> Was ein Skript nicht abnehmen kann, ist der Klick im Dialog. Also einmal von
+> Hand: `http://localhost:3000` eintragen, „Zugriff erlauben" drücken, und die
+> Zeile muss danach „ist erteilt" sagen.
 
 > `https://*/*` selbst lässt sich **nicht** verengen. Bei einer selbst
 > gehosteten App ist die Adresse pro Nutzer verschieden, und Manifest V3 kennt
@@ -269,33 +274,71 @@ Weitere Felder im Vertriebs-Tab: **kostenlos**, **alle Regionen**.
 ## 5. Screenshots aufnehmen
 
 Mindestens einer ist Pflicht, bis zu fünf gehen. **1280 × 800 Pixel**, PNG oder
-JPEG, randlos, keine abgerundeten Ecken, kein Rahmen. Sie sollen die echte
-Oberfläche zeigen — dafür gibt es kein Skript, das musst du selbst machen.
+JPEG, randlos, keine abgerundeten Ecken, kein Rahmen.
 
-Diese fünf Motive, in dieser Reihenfolge:
-
-1. Popup über einem Fachartikel, Felder gefüllt, Herkunftszeile sichtbar
-2. Kontextmenü „Als Zitat erfassen" bei markiertem Text
-3. Benachrichtigung mit dem Rückgängig-Knopf
-4. Options-Seite mit Serveradresse, Token, Verbindungstest, Standardbuch
-5. Warteschlange mit einem wartenden und einem gescheiterten Eintrag
-
-Nummer 1 und 4 sind die wichtigsten. Wenn du nur zwei machst, dann die.
-
-### Genau 1280 × 800 treffen
-
-Der zuverlässigste Weg — Chrome mit fester Fenstergröße und eigenem Profil, damit
-keine anderen Erweiterungen ins Bild geraten:
+Drei Motive nimmt ein Werkzeug ab:
 
 ```bash
-google-chrome \
+SHOTS_TOKEN=swd_… npm run shots          # deutsch
+SHOTS_LANG=en SHOTS_TOKEN=swd_… npm run shots   # englisch, Dateien mit -en
+```
+
+[tools/make-shots.mjs](../tools/make-shots.mjs) startet Chrome mit einem
+Wegwerf-Profil, lädt `dist/`, richtet die Verbindung gegen die Demo-Instanz
+**wirklich ein** — Adresse und Token in die Maske, speichern, Verbindung testen,
+Bücher laden — und legt in `store/assets/` ab:
+
+| Datei | Motiv |
+|---|---|
+| `shot-1-popup.png` | Popup über einem Fachartikel, Felder gefüllt, Herkunftszeile sichtbar |
+| `shot-2-options.png` | Options-Seite mit Adresse, Token, Verbindungstest, Standardbuch |
+| `shot-3-queue.png` | Serverfähigkeiten, Warteschlange, „Was verlässt den Browser" |
+
+Stellschrauben: `SHOTS_SERVER`, `SHOTS_ARTICLE` (Vorgabe ist ein
+arXiv-Abstract mit vollständigen `citation_*`-Metadaten), `SHOTS_THEME=dark`,
+`SHOTS_PORT`, `SHOTS_DEBUG=1`.
+
+Zwei Dinge daran sind erwähnenswert, weil sie sonst beim nächsten Lesen
+verwundern:
+
+- Das Werkzeug kopiert `dist/` und trägt in der Kopie Server- und Artikel-Origin
+  unter `host_permissions` ein. Nicht um zu schummeln, sondern weil
+  `chrome.permissions.request()` und `activeTab` eine echte Mausgeste
+  verlangen, die sich nicht fernsteuern lässt. Gezeigt wird derselbe Code mit
+  echten Daten vom Server.
+- `--load-extension` gibt es seit Chrome 137 nicht mehr; entpackt geladen wird
+  über `Extensions.loadUnpacked` im DevTools-Protokoll.
+
+**Zwei Motive bleiben Handarbeit** — beide zeichnet das Betriebssystem, kein
+Fernsteuerungsprotokoll bekommt sie zu fassen:
+
+- **Kontextmenü** „Als Zitat erfassen" bei markiertem Text
+- **Benachrichtigung** mit dem Rückgängig-Knopf (das Fenster sind 6 Sekunden)
+
+Auf dem Mac: `Umschalt+Cmd+4`, dann Leertaste für das ganze Fenster. Danach auf
+genau 1280 × 800 bringen (Rezept unten). Pflicht sind sie nicht — die drei
+automatisch erzeugten Bilder reichen für die Einreichung.
+
+### Genau 1280 × 800 treffen (für die beiden Bilder von Hand)
+
+`npm run shots` misst seine Bilder selbst nach. Für die zwei Motive, die du
+selbst aufnimmst, gilt: Chrome mit fester Fenstergröße und eigenem Profil, damit
+keine anderen Erweiterungen ins Bild geraten. Auf dem Mac:
+
+```bash
+"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
   --user-data-dir=/tmp/cws-shots \
   --window-size=1280,800 \
   --window-position=0,0 \
   --force-device-scale-factor=1 \
-  --load-extension="$PWD/dist" \
+  --enable-unsafe-extension-debugging \
   --no-first-run
 ```
+
+Die Erweiterung lädst du darin von Hand über `chrome://extensions` →
+„Entpackte Erweiterung laden" → `dist/`. Der frühere Weg über
+`--load-extension` funktioniert seit Chrome 137 nicht mehr; der Schalter wird
+stillschweigend ignoriert, und die Erweiterung fehlt einfach.
 
 Auf einem HiDPI-Bildschirm ist `--force-device-scale-factor=1` nicht optional:
 sonst liefert der Screenshot 2560 × 1600, und der Store lehnt das Bild ohne
@@ -303,7 +346,7 @@ brauchbare Meldung ab.
 
 Der Fensterinhalt ist wegen der Titelleiste kleiner als 1280 × 800. Nimm also
 den Bildschirm auf und schneide zu, oder — genauer — nimm den Inhaltsbereich mit
-DevTools auf: `Strg+Umschalt+P` → *Capture screenshot*. Danach immer die Maße
+DevTools auf: `Cmd+Umschalt+P` → *Capture screenshot*. Danach immer die Maße
 kontrollieren:
 
 ```bash
@@ -320,8 +363,12 @@ convert screenshot.png -resize 1280x800 -background '#f7f4ee' \
 
 ### Für den englischen Eintrag
 
-Dieselbe Zeile, ergänzt um `--lang=en-US`. Die Erweiterung folgt der
-Browsersprache, du bekommst also ohne Zusatzaufwand eine englische Oberfläche.
+`SHOTS_LANG=en npm run shots` — die Dateien bekommen dann `-en` angehängt.
+
+Von Hand ist es auf dem Mac umständlicher: `--lang=en-US` allein reicht nicht,
+macOS zieht die Oberflächensprache aus den Systemeinstellungen. Chrome mit
+`-AppleLanguages "(en-US)"` als zusätzlichem Argument starten — genau das macht
+das Werkzeug.
 
 ### Beschriftung
 
@@ -390,7 +437,7 @@ genaueren Blick.
 null und kann das Konto wegen schneller Wiedereinreichungen markieren. Warte ab.
 
 Was hier für dich spricht: kein `eval`, kein `innerHTML`, keine externe Adresse
-im Paket, kein nachgeladener Code, unminifizierter Quelltext, 224 durchlaufende
+im Paket, kein nachgeladener Code, unminifizierter Quelltext, 230 durchlaufende
 Tests und ausformulierte Begründungen für jede einzelne Berechtigung.
 
 Bei einer Ablehnung nennt die E-Mail den verletzten Richtlinienabschnitt. Meist
@@ -450,15 +497,17 @@ Vor dem Einreichen:
 - [ ] Einrichtung in einem frischen Chrome-Profil einmal selbst durchgeklickt,
       so wie der Prüfer sie vorfindet
 - [ ] `npm run promo` gelaufen, beide Kacheln vorhanden
-- [ ] mindestens ein Screenshot in genau 1280 × 800, mit `file` geprüft
+- [ ] `npm run shots` gelaufen, drei Screenshots in genau 1280 × 800
+      (das Werkzeug misst nach und meckert sonst)
 - [ ] Begründung für jede der sechs Berechtigungen **und** für die
       Host-Berechtigung eingesetzt
 - [ ] nachgeladener Code: **nein** angegeben
 - [ ] Datennutzung: Website-Inhalte und Authentifizierungsdaten angehakt
 - [ ] alle drei Zertifizierungen bestätigt
 - [ ] Sichtbarkeit auf „nicht aufgeführt" gestellt
-- [ ] entschieden, ob `http://*/*` auf localhost verengt wird
-      ([Begründung](#das-weite-host-muster-fällt-auf))
+- [ ] `http`-Muster in einem echten Chrome nachgeprüft: localhost wird erteilt,
+      eine nicht-lokale `http`-Adresse abgewiesen
+      ([warum](#das-weite-host-muster-fällt-auf))
 
 ---
 

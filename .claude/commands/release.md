@@ -94,6 +94,12 @@ Version, Dateizahl, Größe und **SHA-256** aus der Ausgabe übernehmen — die
 gehören in die Release-Notizen. Das Archiv ist reproduzierbar, gleiches `dist/`
 ergibt byteweise dasselbe ZIP.
 
+`dist/` bleibt danach im Arbeitsverzeichnis liegen und ist genau der Stand, der
+im ZIP steckt. Für die eigene Nutzung also **kein Entpacken nötig**: in
+`chrome://extensions` reicht der Reload-Pfeil an einer bereits entpackt
+geladenen Erweiterung, sonst einmal „Entpackte Erweiterung laden" auf `dist/`.
+Das gilt auch bei `--dry-run` — gebaut wird trotzdem.
+
 ## 5. Notizen schreiben
 
 Commits seit dem letzten Tag sammeln (beim ersten Release: alle):
@@ -169,8 +175,9 @@ den Befehl zum Nachholen ausgeben — nicht den Tag löschen.
 
 ## 8. Abschluss
 
-Melden: Release-URL, Tag, SHA-256 des ZIP. Danach der Hinweis, was noch offen
-ist:
+Melden: Release-URL, Tag, SHA-256 des ZIP. Dazu, dass `dist/` auf diesem Stand
+gebaut ist und in `chrome://extensions` nur noch neu geladen werden muss.
+Danach der Hinweis, was noch offen ist:
 
 - Store-Upload von Hand: Developer Dashboard → **Paket** → **Neues Paket
   hochladen**, Ablauf und Fallstricke in

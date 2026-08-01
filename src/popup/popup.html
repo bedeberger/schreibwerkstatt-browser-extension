@@ -69,6 +69,8 @@
 
       <!-- Dublettenhinweis -->
       <p id="duplicate-notice" class="notice notice--info" hidden></p>
+      <!-- Die Dublettenpruefung konnte nur einen Ausschnitt sehen. -->
+      <p id="duplicate-incomplete" class="notice notice--muted" hidden></p>
       <!-- Herkunftshinweis -->
       <p id="provenance-notice" class="notice notice--muted" hidden></p>
 
@@ -112,6 +114,8 @@
           </label>
           <textarea id="body" name="body" class="input input--area" rows="7"></textarea>
           <p class="field__hint field__hint--warn" id="truncation-hint" hidden></p>
+          <!-- Was der Server beim Speichern still abschneiden wuerde. -->
+          <p class="field__hint field__hint--warn" id="clamp-hint" hidden></p>
           <p class="field__hint field__hint--warn" id="verbatim-hint" hidden data-i18n="popup_verbatim_hint">
             Markierter Wortlaut — unverändert übernommen.
           </p>

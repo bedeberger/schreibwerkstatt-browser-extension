@@ -90,31 +90,124 @@
     "message": "The limit is $1 characters, the selection had $2."
   },
   "err_not_logged_in": {
-    "message": "The device token is no longer valid. Create a new one in the web app."
+    "message": "The device token is no longer valid — it has expired or been revoked. Create a new one in the web app and enter it here."
   },
-  "err_capture_scope_required": {
-    "message": "This token is not allowed to capture. Create a token with capture permission in the web app."
+  "err_device_scope_forbidden": {
+    "message": "This token is not allowed to do that. It was issued as a capture token (kind: 'capture') and can only reach the paths cleared for capturing. Get a suitable one in the web app under Settings › Devices."
+  },
+  "err_demo_token_fixed": {
+    "message": "This demo token is fixed and cannot be revoked through the interface."
+  },
+  "err_no_book_access": {
+    "message": "You have no access to this book — or it does not exist. The server deliberately does not distinguish the two."
+  },
+  "err_insufficient_role": {
+    "message": "You may only read this book (role: $1). Capturing needs $2 rights — the book's owner grants those."
+  },
+  "err_invalid_id": {
+    "message": "The book reference is missing or invalid."
+  },
+  "err_bookid_req": {
+    "message": "This needs a book. Please pick one."
+  },
+  "err_invalid_value": {
+    "message": "The server does not accept this value for “$1”. Allowed: $2."
+  },
+  "err_invalid_url": {
+    "message": "The server cannot process this address. It must start with http:// or https://."
+  },
+  "err_empty": {
+    "message": "A research find needs at least a title, some text or a URL."
   },
   "err_source_identity_req": {
     "message": "A source needs at least a title or one person."
   },
   "err_citekey_taken": {
-    "message": "That citation key is already taken."
+    "message": "The citation key “$1” is already taken in your library."
   },
-  "err_book_not_found": {
-    "message": "That book does not exist (any more)."
+  "err_item_not_found": {
+    "message": "The research find this attachment belongs to does not exist on the server."
   },
-  "err_book_access_denied": {
-    "message": "You cannot write to that book."
+  "err_no_image": {
+    "message": "The server saw no image — the attachment was empty or had the wrong type."
   },
-  "err_forbidden": {
-    "message": "The server refused access."
+  "err_image_invalid": {
+    "message": "The server could not read this image."
   },
-  "err_validation_failed": {
-    "message": "The server rejected the data."
+  "err_no_doc": {
+    "message": "The server saw no PDF — the attachment was empty or had the wrong type."
+  },
+  "err_doc_too_large": {
+    "message": "The PDF is larger than the 25 MB allowed."
+  },
+  "err_doc_not_pdf": {
+    "message": "This file is not a PDF."
+  },
+  "err_doc_unreadable": {
+    "message": "The server could not read this PDF — it is encrypted or damaged."
+  },
+  "err_not_source_owner": {
+    "message": "This source belongs to another account. Only whoever holds it in their library may change it."
+  },
+  "err_url_req": {
+    "message": "This query is missing the address."
+  },
+  "err_lookup_param_required": {
+    "message": "The lookup needs either a DOI or an ISBN."
+  },
+  "err_lookup_param_ambiguous": {
+    "message": "Please give either a DOI or an ISBN, not both."
+  },
+  "err_invalid_doi": {
+    "message": "This DOI cannot be read."
+  },
+  "err_invalid_isbn": {
+    "message": "This ISBN cannot be read."
+  },
+  "err_lookup_not_found": {
+    "message": "The registry does not know this identifier. The fields stay as they are."
+  },
+  "err_lookup_unavailable": {
+    "message": "The registry (Crossref or OpenLibrary) is currently unreachable."
+  },
+  "err_lookup_failed": {
+    "message": "The registry answered, but unusably."
+  },
+  "err_no_server_configured": {
+    "message": "No server address has been entered yet."
+  },
+  "err_no_token_configured": {
+    "message": "No device token has been entered yet."
+  },
+  "err_client_validation_failed": {
+    "message": "The data is incomplete — nothing was sent."
+  },
+  "err_client_image_too_large": {
+    "message": "The screenshot is larger than the 12 MB allowed."
+  },
+  "err_client_doc_too_large": {
+    "message": "The PDF is larger than the 25 MB allowed — nothing was sent."
+  },
+  "err_client_payload_too_large": {
+    "message": "This entry is too large for a single call."
+  },
+  "err_harvest_failed": {
+    "message": "This page cannot be read. On Chrome's own pages and in the Web Store that is normal."
+  },
+  "err_no_active_tab": {
+    "message": "No active tab found."
+  },
+  "err_invalid_server_url": {
+    "message": "This server address cannot be used."
+  },
+  "err_unknown_message": {
+    "message": "Internal extension error: unknown request."
+  },
+  "err_unmapped_code": {
+    "message": "The server reported an error this version of the extension does not know (HTTP $2): $1"
   },
   "err_payload_too_large": {
-    "message": "The payload is too large for the server."
+    "message": "The server aborted the transfer because it was too large. Limits: image 12 MB, PDF 25 MB."
   },
   "err_unsupported_media_type": {
     "message": "The server does not accept this file type."
@@ -296,6 +389,36 @@
   "popup_truncated_hint": {
     "message": "Shortened to $1 characters (original: $2), cut at a sentence boundary."
   },
+  "popup_clamp_hint": {
+    "message": "The server shortens silently when saving — these fields will go out shortened: $1"
+  },
+  "popup_clamp_field": {
+    "message": "$1 (cut to $2, currently $3)"
+  },
+  "popup_clamp_title": {
+    "message": "Title"
+  },
+  "popup_clamp_body": {
+    "message": "Text"
+  },
+  "popup_clamp_source": {
+    "message": "Origin URL"
+  },
+  "popup_clamp_tags": {
+    "message": "Tags"
+  },
+  "popup_clamp_urls": {
+    "message": "Further links"
+  },
+  "popup_clamp_url": {
+    "message": "Source URL"
+  },
+  "popup_saved_source_existed": {
+    "message": "The source was already in your library and was only linked to the book."
+  },
+  "popup_saved_research_existed": {
+    "message": "This research find already existed — the server recognised the double click."
+  },
   "popup_source_details": {
     "message": "Source details"
   },
@@ -376,6 +499,18 @@
   },
   "popup_duplicate_in_library": {
     "message": "This source is already in your library, but not in this book."
+  },
+  "popup_duplicate_research": {
+    "message": "This book already holds $1 entry/entries for this page."
+  },
+  "popup_duplicate_incomplete_limit": {
+    "message": "Only the $1 most recently changed entries were checked – older duplicates cannot be ruled out."
+  },
+  "popup_duplicate_incomplete_fts": {
+    "message": "The server's search stops after $1 hits – “nothing found” does not mean “not there”."
+  },
+  "popup_duplicate_scope_missing": {
+    "message": "Duplicate check unavailable: the device token lacks read permission (DEVICE_SCOPE_FORBIDDEN)."
   },
   "popup_submit": {
     "message": "Send"
@@ -580,6 +715,9 @@
   },
   "options_cap_unknown": {
     "message": "unknown"
+  },
+  "options_cap_research_scope_missing": {
+    "message": "GET /research exists, but this device token may not read (DEVICE_SCOPE_FORBIDDEN). The duplicate check stays off."
   },
   "options_cap_probed": {
     "message": "Last checked $1."

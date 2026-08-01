@@ -7,6 +7,7 @@
  */
 
 import { CAPABILITY_MODE, TOKEN_PREFIX, TOKEN_STATE, canWriteToBook } from '../shared/config.js';
+import { describeError } from '../shared/errors.js';
 import { applyI18n, formatRelativeTime, t } from '../shared/i18n.js';
 import { MSG, send } from '../shared/messages.js';
 import { isLocalHost, normalizeServerUrl, toOriginPattern } from '../shared/url.js';
@@ -43,6 +44,9 @@ const ui = {
   capCaptureMode: el('cap-capture-mode'),
   capByUrlDetected: el('cap-byurl-detected'),
   capByUrlMode: el('cap-byurl-mode'),
+  capResearchDetected: el('cap-research-detected'),
+  capResearchMode: el('cap-research-mode'),
+  capResearchScope: el('cap-research-scope'),
   capProbedAt: el('cap-probed-at'),
 
   flushQueue: el('flush-queue'),
@@ -79,6 +83,7 @@ async function reload() {
 
   ui.capCaptureMode.value = state.capabilities.capture.mode;
   ui.capByUrlMode.value = state.capabilities.byUrl.mode;
+  ui.capResearchMode.value = state.capabilities.researchList.mode;
 
   ui.versionLine.textContent = t('options_version', [state.version]);
 
@@ -133,6 +138,9 @@ function wireEvents() {
     void setCapabilityMode('capture', ui.capCaptureMode.value),
   );
   ui.capByUrlMode.addEventListener('change', () => void setCapabilityMode('byUrl', ui.capByUrlMode.value));
+  ui.capResearchMode.addEventListener('change', () =>
+    void setCapabilityMode('researchList', ui.capResearchMode.value),
+  );
 
   ui.flushQueue.addEventListener('click', () => void flushQueue());
 }
@@ -240,11 +248,21 @@ async function testConnection() {
   }
 }
 
+/**
+ * Der Fehlercode gehoert in die Meldung — beides kommt aus derselben Map wie
+ * jede andere Fehlermeldung, damit hier nie ein Code steht, den der Server
+ * nicht sendet. `CAPTURE_SCOPE_REQUIRED` stand genau so lange hier, wie es
+ * niemand nachgeprueft hat.
+ */
 function renderTokenState() {
   if (state.tokenState === TOKEN_STATE.INVALID) {
-    showNotice(ui.connectionResult, t('err_not_logged_in') + ' (NOT_LOGGED_IN)', 'error');
+    showNotice(ui.connectionResult, describeError({ status: 401, code: 'NOT_LOGGED_IN' }, t).text, 'error');
   } else if (state.tokenState === TOKEN_STATE.SCOPE_MISSING) {
-    showNotice(ui.connectionResult, t('err_capture_scope_required') + ' (CAPTURE_SCOPE_REQUIRED)', 'error');
+    showNotice(
+      ui.connectionResult,
+      describeError({ status: 403, code: 'DEVICE_SCOPE_FORBIDDEN' }, t).text,
+      'error',
+    );
   }
 }
 
@@ -329,6 +347,15 @@ async function saveSettings() {
 function renderCapabilities() {
   ui.capCaptureDetected.textContent = detectedLabel(state.capabilities.capture.detected);
   ui.capByUrlDetected.textContent = detectedLabel(state.capabilities.byUrl.detected);
+  ui.capResearchDetected.textContent = detectedLabel(state.capabilities.researchList.detected);
+
+  // Endpunkt da, Token darf ihn nicht lesen — das ist eine andere Aussage als
+  // „nicht erkannt" und muss auch so dastehen.
+  ui.capResearchScope.hidden = !state.capabilities.researchList.scopeMissing;
+  ui.capResearchScope.textContent = state.capabilities.researchList.scopeMissing
+    ? t('options_cap_research_scope_missing')
+    : '';
+
   ui.capProbedAt.textContent = state.capabilities.probedAt
     ? t('options_cap_probed', [formatRelativeTime(state.capabilities.probedAt)])
     : t('options_cap_never_probed');
@@ -342,7 +369,7 @@ function detectedLabel(value) {
 }
 
 /**
- * @param {'capture'|'byUrl'} name
+ * @param {'capture'|'byUrl'|'researchList'} name
  * @param {string} mode
  */
 async function setCapabilityMode(name, mode) {

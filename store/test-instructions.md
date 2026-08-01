@@ -1,6 +1,9 @@
 # Testanleitung für die Prüfung
 
 Der Text im Kasten geht in das Feld **„Testanleitung"** im Developer-Dashboard.
+Das Feld fasst nur **500 Zeichen** — die Langfassung steht deshalb in
+[REVIEW.md](REVIEW.md) und wird von dort verlinkt; ins Feld selbst geht die
+[Kurzfassung](#kurzfassung-für-das-500-zeichen-feld).
 
 Warum das der wichtigste Text der ganzen Einreichung ist: die Erweiterung ist
 ohne Server und Token **funktionslos**. Ein Prüfer, der das Popup öffnet und nur
@@ -20,7 +23,8 @@ Tabelle, damit sie nur an einer Stelle stehen.
 | Adresse | `https://demo.schreibwerkstatt.app` |
 | Gerätetoken | `swd_a053dcf5c8a40ff401d627be20ffed97f1af2598808ad70799913811f7780010` |
 | Web-App-Login | `demo@demo.schreibwerkstatt.app` / `DfAo9j2YjeGSG-wk` |
-| Zielbuch | eines der Bücher, die die Demo-Instanz seedet — die Auswahl im Popup zeigt sie |
+| Zielbuch | **Beispiel: Die Verwandlung** — das Buch, das dem Demo-Konto gehört |
+| Buch für den Fehlerpfad | **Fremdes Buch** — gehört einem anderen Konto, Demo-User ist nur `viewer` |
 
 > **Bewusst öffentlich.** Diese Zugangsdaten stehen in einem öffentlichen
 > Repository. Sie gehören zu einer Demo-Instanz mit Beispieldaten, die nichts
@@ -50,12 +54,23 @@ Damit die Prüfung glatt läuft und nichts durchsickert:
 
 - **Mindestens ein Buch mit `owner`- oder `editor`-Rolle**, in das der Prüfer
   erfassen kann. Sonst kommt er über den Verbindungstest nicht hinaus.
-- **Ein Buch mit `viewer`-Rolle**, z. B. „Fremdes Buch". Nice to have: damit
-  lässt sich der Fehlerpfad `BOOK_ACCESS_DENIED` vorführen, und dass die
-  Erweiterung Fehler sauber benennt statt stillschweigend zu scheitern, ist ein
-  gutes Argument. **Zurzeit nicht geseedet** — der Formulartext unten führt den
-  Fehlerpfad deshalb nicht auf. Kommt das Buch dazu, den Abschnitt aus
-  [Variante B](#variante-b--referenz-server-aus-diesem-repo) wieder einsetzen.
+  → *Erledigt:* „Beispiel: Die Verwandlung", Rolle `owner`.
+- **Ein Buch mit `viewer`-Rolle** für den Fehlerpfad.
+  → *Erledigt:* der Demo-Seed legt „Fremdes Buch" an, Eigentümer ist ein
+  erfundenes Konto auf `example.org`, der Demo-User hat dort `viewer`.
+
+  Damit ist `403 INSUFFICIENT_ROLE` vorführbar, und das ist das stärkere
+  Argument für die Prüfung: die Erweiterung *benennt* den Fehler samt Ursache
+  („du darfst dieses Buch nur lesen — zum Erfassen brauchst du `editor`") statt
+  stillschweigend zu scheitern. Der Schritt steht unten im Formulartext als
+  **C) Error handling**.
+
+  Zur Genauigkeit: der Server verlangt zum Erfassen `editor`. Wer *gar keinen*
+  Zugriff hat, bekommt `NO_BOOK_ACCESS` — dasselbe auch dann, wenn das Buch nicht
+  existiert. Das ist Absicht, damit fremde Buch-Ids nicht abfragbar sind.
+- **`GET /content/books` muss `role` und `owner_email` je Zeile liefern.** Daran
+  hängt, dass das Popup nur-lesbare Bücher ausgegraut anzeigt statt sie beim
+  Senden scheitern zu lassen.
 - **Keine echten E-Mail-Adressen im Seed.** `GET /content/books` gibt zu jedem
   Buch die `owner_email` heraus, und der Prüfer sieht die Antwort. Nimm
   `example.org`-Adressen — nicht deine, und erst recht nicht die von
@@ -63,6 +78,17 @@ Damit die Prüfung glatt läuft und nichts durchsickert:
 - **Ein Token, das nicht abläuft** oder das mindestens mehrere Wochen gültig
   bleibt. Die Prüfung kann Wochen dauern; läuft das Token mitten darin aus, sieht
   der Prüfer eine Erweiterung, die sich nicht verbinden kann.
+
+  Dafür gibt es im Mutterprojekt den vorgesehenen Weg: `DEMO_CAPTURE_TOKEN` in
+  der ENV der Demo-Instanz (`lib/demo-user.js` → `ensureDemoTokens`, registriert
+  beim **Serverstart**). Der Klartext steht dann hier und in den Reviewer-Notes,
+  die Datenbank hält weiter nur den Hash, und die Scopes kommen aus `TOKEN_KINDS`
+  — kein Sonderrechte-Pfad. Widerruf über `/me/device-tokens` ist für diese Rows
+  gesperrt (`403 DEMO_TOKEN_FIXED`); entzogen wird über die ENV.
+
+  **Das ist auch die Antwort auf den nächsten Punkt:** ein Token, das in der
+  Datenbank steht, verschwindet beim nächtlichen Zurücksetzen der Demo-Daten —
+  eines aus der ENV wird beim Serverstart wieder eingetragen.
 - **Regelmäßiges Zurücksetzen der Demo-Daten**, z. B. per Cron nächtlich. Der
   Prüfer legt Einträge an, der API-Vertrag kennt kein `DELETE /research/:id`, und
   bei einer Nachbesserung oder einem späteren Update kommt die nächste Runde.
@@ -90,6 +116,37 @@ aber es nimmt dem Test die letzte Unschärfe: er sieht nicht nur „Gesendet" in
 Erweiterung, sondern den Eintrag danach in der Anwendung stehen. Das ist genau
 der Nachweis, dass die Erweiterung tut, was der Store-Eintrag behauptet.
 
+### Kurzfassung für das 500-Zeichen-Feld
+
+Das ist der Text, der wirklich ins Dashboard geht — 485 Zeichen. Adresse und
+Token stehen **im Feld selbst**, nie nur hinter dem Link: ein Prüfer, der nicht
+klickt, muss trotzdem loslegen können. Alles andere trägt
+[REVIEW.md](REVIEW.md).
+
+```
+Companion to a self-hosted app; no bundled backend, so it needs a server. Public demo, sample data only:
+
+Options page > Server https://demo.schreibwerkstatt.app > Token swd_a053dcf5c8a40ff401d627be20ffed97f1af2598808ad70799913811f7780010 > Save > "Grant access to this host" > "Test connection" > pick a book. Then open an article, click the icon, press Send.
+
+Full steps, web-app login, review notes:
+github.com/bedeberger/schreibwerkstatt-browser-extension/blob/main/store/REVIEW.md
+```
+
+Die Begründungen — kein Remote Code, kein `<all_urls>`, `activeTab` nur bei
+Nutzeraktion, kein Default-Server — gehören **nicht** hierher, sondern in die
+Felder, die das Dashboard dafür hat: Einzelzweck, je eine Rechtfertigung pro
+Berechtigung, die Remote-Code-Erklärung und die Datenschutzerklärung. Die liest
+die Prüfung ohnehin, und sie zählen nicht gegen die 500 Zeichen.
+
+> Wenn die Demo-Instanz einmal eine Seite unter `/review` ausliefert, wird der
+> Link von 90 auf 40 Zeichen kürzer — Platz für einen weiteren Satz. Das ist
+> Infrastruktur der Demo-Instanz, keine API-Änderung.
+
+### Langfassung (Inhalt von REVIEW.md)
+
+Derselbe Text steht in [REVIEW.md](REVIEW.md); wer hier etwas ändert, zieht dort
+nach.
+
 ```
 Schreibwerkstatt is a self-hosted writing app; this extension is its browser
 companion and has no bundled backend. It cannot be exercised without a server,
@@ -108,8 +165,11 @@ SETUP (about one minute)
    permission justification. The manifest deliberately contains no <all_urls>;
    the address of a self-hosted app differs per user and cannot be declared in
    the manifest, so it is requested at runtime for exactly one origin.
-5. Click "Test connection". The demo instance's books load.
-6. Pick any of the books offered as the default book.
+5. Click "Test connection". Two books load: "Beispiel: Die Verwandlung"
+   (owned by the demo account) and "Fremdes Buch" (owned by someone else, the
+   demo account has read-only access there). Read-only books are shown greyed
+   out, not hidden.
+6. Pick "Beispiel: Die Verwandlung" as the default book.
 
 OPTIONAL: SEEING THE RESULT IN THE APP
 
@@ -145,7 +205,18 @@ B) Capture a quote
    press Undo within 6 seconds, no server record is created at all; the request
    is only sent after the undo window closes.
 
-C) Offline queue (optional)
+C) Error handling — the extension names failures instead of swallowing them
+   In the capture form, switch the book to "Fremdes Buch" and press Send. That
+   book belongs to another account and the demo user has read-only access, so
+   the server refuses the write. The extension reports precisely why, naming
+   both the reason and the error code:
+
+     "You may only read this book (role: viewer). Capturing needs editor
+      rights — the book's owner grants those. (INSUFFICIENT_ROLE)"
+
+   The item stays in the visible queue; nothing is discarded silently.
+
+D) Offline queue (optional)
    Change the server address to an unreachable host and capture a page. The item
    goes into a retry queue with exponential backoff and is shown on the toolbar
    badge. Nothing is ever dropped silently.
@@ -165,11 +236,16 @@ NOTES FOR REVIEW
 Contact for questions during review: bede.berger@gmail.com
 ```
 
-> Der Fehlerpfad `BOOK_ACCESS_DENIED` steht hier **nicht** mehr drin: die
-> Demo-Instanz seedet kein `viewer`-Buch, und etwas anzukündigen, was der Prüfer
-> nicht vorfindet, ist schlimmer als es wegzulassen. Kommt später ein Buch
-> „Fremdes Buch" mit `viewer`-Rolle dazu, gehört der Abschnitt wieder hinein —
-> der Wortlaut steht in [Variante B](#variante-b--referenz-server-aus-diesem-repo).
+> Der Fehlerpfad „kein Schreibrecht" ist wieder drin (**C**), weil der Demo-Seed
+> jetzt zwei Bücher anlegt. Voraussetzung ist, dass die Demo-Instanz auf einem
+> Stand mit diesem Seed läuft — sonst findet der Prüfer „Fremdes Buch" nicht, und
+> etwas anzukündigen, was er nicht vorfindet, ist schlimmer als es wegzulassen.
+> Vor dem Absenden einmal prüfen (Checkliste unten).
+>
+> Echte Instanz und Referenz-Server aus [Variante B](#variante-b--referenz-server-aus-diesem-repo)
+> antworten hier inzwischen gleich: `403 INSUFFICIENT_ROLE` mit
+> `detail: { actual: 'viewer', required: 'editor' }`. Der erfundene Code
+> `BOOK_ACCESS_DENIED` ist aus Client und Attrappen entfernt.
 
 ---
 
@@ -186,8 +262,9 @@ REVIEW_TOKEN=swd_pruefung_$(openssl rand -hex 12) PORT=8787 npm run review-serve
 API-Vertrag an, gegen den `test/integration.test.js` prüft — Zustand nur im
 Arbeitsspeicher, kein Plattenzugriff, kein Bezug zu echten Daten. Er liefert
 *Nordlicht* (owner), *Mitschrift* (editor) und *Fremdes Buch* (viewer, gibt
-absichtlich `BOOK_ACCESS_DENIED`), protokolliert jede Anfrage und ist nach
-Strg+C restlos weg. Braucht ebenfalls HTTPS über deinen Reverse-Proxy.
+absichtlich `403 INSUFFICIENT_ROLE` mit `detail: { actual: 'viewer', required:
+'editor' }`), protokolliert jede Anfrage und ist nach Strg+C restlos weg.
+Braucht ebenfalls HTTPS über deinen Reverse-Proxy.
 
 Formulartext aus Variante A übernehmen, aber den ersten Absatz ersetzen — hier
 ist der Vorbehalt Pflicht, weil es *nicht* die echte Anwendung ist:
@@ -202,18 +279,10 @@ tools/review-server.mjs and test/helpers/mock-server.js, so you can verify that
 the extension speaks exactly the documented contract.
 ```
 
-In Schritt 6 „Nordlicht" als Zielbuch nennen.
-
-Weil dieser Server ein `viewer`-Buch mitbringt, gehört hier zusätzlich der
-Fehlerpfad in die Aufzählung — vor „C) Offline queue" einsetzen und die
-Buchstaben nachziehen:
-
-```
-C) Error handling
-   Capture into the book "Fremdes Buch". The account has viewer access only, so
-   the server refuses it and the extension reports precisely why, naming the
-   error code, instead of failing silently.
-```
+In Schritt 5/6 „Nordlicht" als Zielbuch nennen; die Bücherliste heißt hier
+*Nordlicht*, *Mitschrift*, *Fremdes Buch* statt der Namen aus dem Demo-Seed.
+Schritt **C) Error handling** stimmt unverändert — auch dieser Server antwortet
+auf „Fremdes Buch" mit `403 INSUFFICIENT_ROLE`.
 
 ---
 
@@ -227,7 +296,7 @@ C) Error handling
   nicht erlaubt haben.
 - Der API-Vertrag kennt kein `DELETE /research/:id`. Die Testeinträge des
   Prüfers räumst du in der Web-App von Hand weg.
-- Der Fehlerpfad `BOOK_ACCESS_DENIED` lässt sich nicht vorführen, ohne dir selbst
+- Der Fehlerpfad `INSUFFICIENT_ROLE` lässt sich nicht vorführen, ohne dir selbst
   ein Buch zu entziehen.
 
 Variante A und B leisten dasselbe ohne all das.
@@ -294,15 +363,23 @@ Contact: bede.berger@gmail.com
 
 ## Vor dem Absenden
 
-- [ ] Werte in [der Tabelle oben](#werte-für-die-einreichung) und im Formulartext
-      stimmen noch überein
+- [ ] Werte in [der Tabelle oben](#werte-für-die-einreichung), in der Kurzfassung
+      und in [REVIEW.md](REVIEW.md) stimmen noch überein
+- [ ] [REVIEW.md](REVIEW.md) ist nach `main` gepusht — der Link in der
+      Kurzfassung zeigt dorthin und wäre sonst ein 404 vor den Augen der Prüfung
+- [ ] Kurzfassung ist ≤ 500 Zeichen (aktuell 485)
 - [ ] Demo-Instanz über **HTTPS** erreichbar, Zertifikat gültig
 - [ ] Gerätetoken gilt noch und hat die Erfassungs-Berechtigung — einmal
       „Verbindung testen" drücken
 - [ ] Web-App-Login funktioniert, und das Demo-Konto sieht nur Demo-Daten
 - [ ] Seed enthält keine echten E-Mail-Adressen
 - [ ] Token läuft nicht in den nächsten Wochen ab
-- [ ] Aufzählung passt zum Seed — kommt ein `viewer`-Buch dazu, gehört der
-      Fehlerpfad-Abschnitt wieder in den Formulartext
+- [ ] **Demo-Instanz läuft auf einem Stand mit dem Zwei-Bücher-Seed**: „Beispiel:
+      Die Verwandlung" (`owner`) *und* „Fremdes Buch" (`viewer`). Schritt **C**
+      des Formulartexts kündigt beides an — fehlt Buch 2, führt der Text in eine
+      Sackgasse
+- [ ] Schritt **C** einmal selbst ausgelöst: das Erfassen in „Fremdes Buch"
+      scheitert mit einer Meldung, die Rolle *und* Code nennt
+      (`INSUFFICIENT_ROLE`) — nicht mit einem allgemeinen „Nicht erlaubt"
 - [ ] Einrichtung in einem **frischen Chrome-Profil** einmal selbst
       durchgeklickt, so wie der Prüfer sie vorfindet

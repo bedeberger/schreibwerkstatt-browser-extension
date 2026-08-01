@@ -46,11 +46,19 @@ Danach in Chrome:
 
 In der Web-App der Schreibwerkstatt:
 
-**Einstellungen → Geräte → Neues Gerät** → Token kopieren.
+**Einstellungen → Geräte → Neues Gerät** → als Art **Erfassung** (`capture`) wählen
+→ Token kopieren. Der Klartext wird genau einmal angezeigt.
 
-Das Token beginnt mit `swd_`. Es braucht die **Erfassungs-Berechtigung**; ein Token
-ohne diesen Scope wird vom Server mit `CAPTURE_SCOPE_REQUIRED` abgewiesen, und die
-Erweiterung sagt dir das genau so.
+Das Token beginnt mit `swd_` und trägt die Scopes `content:read,capture:write`.
+Damit darf es genau das, was diese Erweiterung tut: Bücher lesen, Fundstücke und
+Quellen anlegen, Anhänge hochladen. Alles andere — Manuskripttext, `/me/*`,
+`/admin/*`, jedes `DELETE` — beantwortet der Server mit `403
+DEVICE_SCOPE_FORBIDDEN`.
+
+Die Einschränkung ist der Punkt: die Erweiterung lebt in fremden Tabs, und ein dort
+entwendetes Token darf nicht am Buch schreiben können. Ein Token der Art **Gerät**
+(`device`, für die macOS- und Android-Clients) funktioniert hier zwar auch, gibt
+aber unnötig viel Recht in einen Browser-Tab.
 
 ### 3. Erweiterung verbinden
 
@@ -360,7 +368,12 @@ Ist `POST /capture` verfügbar, genügt **ein** Request. Sonst der dokumentierte
 Fallback: `POST /research`, `POST /sources`, `POST /sources/:id/link` und die
 Anhänge einzeln.
 
-Die Erkennung nutzt aus, dass die App laut Vertrag *jeden* Fehler als JSON
+Beide Endpunkte — `POST /capture` und `GET /sources/by-url` — sind im Mutterprojekt
+inzwischen vorhanden. Die Erkennung bleibt trotzdem: eine selbst gehostete Instanz
+kann auf einem älteren Stand laufen, und dann muss der lange Weg greifen, statt dass
+die Erfassung an einem `404` scheitert.
+
+Die Erkennung nutzt aus, dass jede *Route* der App ihre Fehler als JSON
 `{ error_code }` beantwortet, eine unbekannte Route bei Express dagegen als
 HTML-Seite:
 
@@ -370,6 +383,13 @@ HTML-Seite:
 | `4xx` **mit** `error_code` | Endpunkt ist da, nur die Probe war ungültig |
 | `401`, `403`, `429` | keine Aussage — das entscheidet die Middleware vor dem Routing |
 | `5xx`, Netzfehler | keine Aussage |
+
+Zwei Fehlerantworten kommen allerdings **nicht** von einer Route, sondern vom
+Body-Parser davor, und tragen deshalb keinen `error_code`: `413` bei zu großem
+Körper und `400` bei syntaktisch kaputtem JSON. Beide sind HTML. Der Client darf
+daran nicht zerbrechen — er liest die Antwort als Text, versucht `JSON.parse` und
+fällt sonst auf den HTTP-Status zurück. Größen prüft er ohnehin vorher, damit die
+Meldung „Datei zu groß“ lautet und nicht „Übertragung abgebrochen“.
 
 Die `/capture`-Probe schickt einen **leeren** Body und muss deshalb mit `400`
 abgewiesen werden; es entsteht kein Datensatz (ein Test prüft das). Geprobt wird
@@ -397,29 +417,69 @@ dritte von vier Requests, setzt der nächste Versuch genau dort fort. Ein
 
 ### Grenzen, die clientseitig geprüft werden
 
-Titel 300 Zeichen, Text 20 000, Bild 12 MB, PDF 25 MB. Wird eine Grenze gerissen,
-lehnt die Erweiterung mit einer klaren Meldung ab, statt auf den `400` zu warten.
-Geernteter Haupttext wird automatisch an einer Satzgrenze gekürzt und das im Popup
-sichtbar vermerkt; ein **Zitat** wird nie heimlich beschnitten, sondern sichtbar
-abgelehnt.
+Es sind zwei Sorten Grenze, und sie verlangen entgegengesetztes Verhalten.
+
+**Textfelder kürzt der Server still** — er lehnt nicht ab, er schneidet ab und
+antwortet `2xx`. Wer das nicht spiegelt, quittiert einen Text, der so nie
+gespeichert wurde. Die Erweiterung kürzt deshalb vorher auf dieselben Längen und
+zeigt es im Popup an:
+
+| Feld | Grenze |
+|---|---|
+| Titel | 300 Zeichen |
+| Text | 20 000 Zeichen |
+| Herkunfts-URL (`source`) | 1 000 Zeichen |
+| Schlagwörter | 60 Zeichen, 20 Stück |
+| URLs | 2 000 Zeichen, 20 Stück; Label 300 |
+| Anhang-Dateiname | 200 Zeichen |
+
+**Ausnahme Wortlauttreue:** ein markiertes **Zitat** über 20 000 Zeichen wird nie
+beschnitten, sondern sichtbar abgelehnt. Geernteter Haupttext dagegen wird an
+einer Satzgrenze gekürzt und das im Popup vermerkt.
+
+**Uploads und der JSON-Körper** laufen in den Body-Parser des Servers, und der
+antwortet bei Überschreitung mit einem nackten `413` als HTML-Seite — ohne
+`error_code`, aus dem sich eine Meldung bauen ließe. Die Erweiterung prüft deshalb
+**vor** dem Request: Bild 12 MB, PDF 25 MB, JSON-Körper von `POST /capture`
+256 kB. Sonst stünde dort „Übertragung abgebrochen“ statt „das PDF ist zu groß“.
 
 ---
 
 ## Getroffene Annahmen
 
-Zwei Stellen des Vertrags waren nicht eindeutig; so ist es umgesetzt:
+Vier Stellen des Vertrags waren beim Bauen nicht eindeutig. Drei sind inzwischen
+gegen den Server geprüft; so steht es jetzt:
 
 1. **`source` in `POST /research`** trägt die Herkunfts-URL als String
    (die normalisierte Fassung). Zusätzliche Links — kanonische URL, PDF — gehen
-   in `urls: [{ url, label }]`.
-2. **`book_id` in `POST /sources`** wird **nicht** mitgeschickt. Die Verknüpfung
-   erfolgt im eigenen `POST /sources/:id/link`, so wie der Vertrag den
-   Zwei-Request-Fallback beschreibt. Sollte `POST /sources` mit `book_id` bereits
-   verknüpfen, wären es zwei Verknüpfungsversuche; deshalb der getrennte Weg.
+   in `urls: [{ url, label }]`. **Bestätigt:** das Feld ist serverseitig Freitext
+   bis 1000 Zeichen und wird mitindexiert; eine URL darin ist vertragsgemäß.
+2. **`book_id` in `POST /sources`** wird **nicht** mitgeschickt; die Verknüpfung
+   erfolgt im eigenen `POST /sources/:id/link`. **Geklärt:** `POST /sources`
+   nimmt ein `book_id` entgegen und verknüpft dann direkt. Der getrennte Weg
+   bleibt trotzdem — er ist der Ablauf, den die Warteschlange schrittweise
+   wiederaufnehmen kann, und er kostet nur auf dem Fallback-Pfad einen Request,
+   den der Normalfall (`POST /capture`) ohnehin nicht geht.
 
-Beides steckt in `src/background/capture-runner.js` und ist mit je einem Test in
-`test/integration.test.js` festgenagelt — eine Änderung ist an einer Stelle
-erledigt.
+3. **Die Dublettenprüfung sagt nie „nicht vorhanden“, wenn sie es nicht wissen
+   kann.** Sie fragt `GET /research` nach dem Buch und vergleicht die URL gegen
+   `urls[].url` der Antwort. Der Server liefert höchstens 200 Zeilen, und mit
+   einem Suchbegriff schneidet sein FTS5-Vorfilter schon bei 500 Treffern ab —
+   beides *bevor* sortiert und begrenzt wird. Kommt die Antwort randvoll zurück,
+   meldet das Popup „nur die zuletzt geänderten Einträge geprüft“ statt
+   Entwarnung. Ein *gefundener* Treffer ist dagegen immer belastbar.
+
+4. **`POST /capture` nimmt keinen `citekey`.** Der dokumentierte Körper führt das
+   Feld nicht auf — obwohl `409 CITEKEY_TAKEN` als Fehlercode dieses Endpunkts
+   dasteht. **Offen.** Bis das geklärt ist, nimmt ein Auftrag mit eigenem
+   Zitierschlüssel nicht den Ein-Request-Pfad, sondern den Fallback, wo
+   `POST /sources` den `citekey` nachweislich annimmt. Kein erfundenes Feld, kein
+   stiller Verlust — ein Request mehr.
+
+Die ersten beiden und die vierte stecken in `src/background/capture-runner.js`,
+die dritte in `src/shared/duplicates.js`; alle sind mit Tests in
+`test/integration.test.js` (und `test/duplicates.test.js`) festgenagelt — eine
+Änderung ist an einer Stelle erledigt.
 
 ---
 

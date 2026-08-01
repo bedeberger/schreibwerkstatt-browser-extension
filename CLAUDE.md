@@ -12,17 +12,28 @@ npm run build     # dist/ erzeugen (unmittelbar in chrome://extensions ladbar)
 npm run watch     # dist/ beobachten
 npm test          # alle Tests, kein Netz und kein Server nötig
 npm run icons     # Symbole neu erzeugen
+npm run package   # store-fertiges ZIP unter store/ (baut vorher)
 npm run promo     # Werbekacheln für den Store
 npm run shots     # Store-Screenshots (braucht SHOTS_TOKEN, siehe store/PUBLISHING.md)
+npm run review-server  # Referenz-Server für die Store-Prüfung (REVIEW_TOKEN setzen)
 npm run clean     # dist/ löschen
 ```
 
 Node ≥ 20. `npm test` muss vor jedem Commit grün sein.
+[.github/workflows/ci.yml](.github/workflows/ci.yml) wiederholt Test **und**
+Build bei jedem Push auf `main` und bei jedem PR, auf Node 20 und 24. Der
+eigentliche Zweck ist der frische Klon: dort baut nur, was wirklich in Git liegt
+— eine vergessene, nicht getrackte Datei fällt lokal nie auf und hier immer.
 
 Ein versionierter Stand entsteht mit dem Befehl `/release`
 ([.claude/commands/release.md](.claude/commands/release.md)): Vorprüfungen, Test,
-`npm run package`, Tag, GitHub-Release mit dem ZIP als Anhang. Der Upload in den
-Chrome Web Store bleibt Handarbeit — [store/PUBLISHING.md](store/PUBLISHING.md).
+`npm run package`, **Commit und Push des gesamten Arbeitsstands**, Tag,
+GitHub-Release mit dem ZIP als Anhang. Das geschieht ohne Rückfrage — wer den
+Ablauf folgenlos sehen will, nimmt `--dry-run`. Weil `git add -A` nicht nach
+Herkunft fragt, ist die Sichtprüfung des Arbeitsstands in Schritt 1 die einzige
+Bremse vor einem öffentlichen Push; die Liste, was dort nie hineingehört, steht
+unten unter *Öffentliches Repository*. Der Upload in den Chrome Web Store bleibt
+Handarbeit — [store/PUBLISHING.md](store/PUBLISHING.md).
 
 ---
 
@@ -39,17 +50,216 @@ die Single Source of Truth, nicht hier:
 |---|---|
 | Vertrag der Erweiterung, Begründungen, Idempotenz-Regeln | [`docs/clients.md`](https://github.com/bedeberger/schreibwerkstatt/blob/main/docs/clients.md) → Abschnitt *„Dritter Client: Browser-Erweiterung"* |
 | `POST /capture` (transaktionaler Ein-Request-Pfad) | `routes/capture.js` |
-| `POST /research`, `POST /research/:id/{image,doc}` | `routes/research.js` |
-| `POST /sources`, `GET /sources/{lookup,by-url}`, `POST /sources/:id/{link,pdf,doc}` | `routes/sources.js` |
+| `POST /research`, `GET /research`, `POST /research/:id/{image,doc}` | `routes/research.js` |
+| `POST /sources`, `GET /sources/{lookup,by-url}`, `POST /sources/:id/link` | `routes/sources.js` |
+| PDF-Anhang einer Quelle: `POST /sources/:id/doc` | `routes/sources-doc.js` (Unterrouter, unter `/sources` gemountet) |
 | Geräte-Token `swd_…` und die durchgesetzte Scope-Allowlist | `lib/device-scopes.js`, `lib/device-auth.js` |
 | Token ausstellen (`POST /me/device-tokens`, `kind: 'capture'`) | `routes/usersettings.js` |
 | URL-Normalisierung serverseitig (Dublettenvergleich) | `lib/url-normalize.js` |
+| Grenzwerte: Titel/Text/Tags | `lib/research-validate.js` |
+| Grenzwerte: PDF (25 MB, `MAX_INPUT_BYTES`) | `lib/pdf-extract.js` |
 
 Die Erweiterung darf nur Pfade ansprechen, die in der `capture:write`-Allowlist
 stehen; alles andere antwortet `403 DEVICE_SCOPE_FORBIDDEN`. Kein `DELETE`, kein
 `/me/*`, kein `/jobs/*`, kein Zugriff auf den Manuskripttext. Die clientseitig
 verwendeten Endpunkte stehen gesammelt in
 [src/background/api-client.js](src/background/api-client.js).
+
+Die Allowlist (`CAPTURE_ALLOW` in `lib/device-scopes.js`) erlaubt mehr, als der
+Client heute nutzt — die Lesepfade `GET /research/tags`, `GET /sources`,
+`GET /sources/{pool,stats}` sind offen. Wer sie in Anspruch nimmt, braucht
+**keine** Serveränderung.
+
+> **Die Allowlist ist keine Routenliste.** Sie sagt, was ein Token *dürfte*,
+> nicht was es gibt. Ein Eintrag `POST /sources/:id/pdf` hat dort einmal einen
+> Client-Aufruf auf einen Pfad erzeugt, den es nie gab (Abweichung 1); der Server
+> hat ihn inzwischen entfernt und die Liste als Rechte-Liste kenntlich gemacht.
+> **Pfade kommen aus `docs/clients.md`, nie aus der Allowlist.**
+
+> **Stand:** gegen `../schreibwerkstatt` bei Commit `ff4e3cae` geprüft (2026-08-01),
+> Fehlercodes und Grenzwerte gegen die Vertragstabelle in `docs/clients.md`
+> nachgezogen. Wer den Vertrag erneut abgleicht, aktualisiert diese Zeile mit.
+
+### `GET /research` — Lesepfad
+
+Serverseitig fix; hier nur gespiegelt. Der Client nutzt ihn für die
+Dublettenprüfung vor dem Erfassen.
+
+```
+GET /research
+Auth:  Authorization: Bearer swd_…       (X-Client-Platform: chrome)
+Scope: content:read                      — capture:write allein genügt NICHT
+ACL:   Rolle `editor` auf book_id
+Idempotenz: reiner Lesepfad, keine Nebenwirkung
+```
+
+| Query | Typ | Bemerkung |
+|---|---|---|
+| `book_id` | int | **Pflicht** |
+| `q` | string | FTS5-Syntax — siehe 500er-Deckel unten |
+| `kind` | enum | `note\|link\|quote\|fact\|image\|document`; Unbekanntes wird ignoriert, nicht abgelehnt |
+| `tag` | string | |
+| `linked` | string | `"<kind>:<id>"` |
+| `sort` | enum | `updated` (Default) \| `created` \| `title` \| `kind` \| `link:<dimension>` |
+| `archived` | `"1"` | sonst nur nicht-archivierte |
+| `limit` | int | Default 50, Max 200. 0, negativ oder Text → Default, **kein 400** |
+
+Antwort `200`: Array, angeheftete zuerst, dann nach `sort`.
+
+```jsonc
+[{
+  "id": 1, "kind": "quote",
+  "title": null, "source": null,
+  "body_snippet": "…",              // max 200 Zeichen, "…" wenn gekürzt
+  "urls": [{ "url": "…", "label": "…" }],
+  "created_at": "2026-01-01T00:00:00.000Z",
+  "updated_at": "2026-01-02T00:00:00.000Z"
+}]
+```
+
+Nicht enthalten: `body`, `tags`, `links`, `doc_*`, `image_mime`, `pinned`,
+`archived`, `book_id`, `user_email`.
+
+| Status | `error_code` | Bedeutung |
+|---|---|---|
+| 400 | `INVALID_ID` | `book_id` fehlt oder ist ungültig |
+| 401 | `NOT_LOGGED_IN` | Token ungültig, widerrufen oder abgelaufen |
+| 403 | `DEVICE_SCOPE_FORBIDDEN` | `content:read` fehlt (Gate greift vor der Route) |
+| 403 | `NO_BOOK_ACCESS` | kein Zugriff auf dieses Buch |
+| 403 | `INSUFFICIENT_ROLE` | nur `viewer`; `detail: { actual, required }` |
+
+**Der 500er-Deckel.** Mit `q` läuft die Anfrage durch einen FTS5-Vorfilter, der
+nach **500 Treffern** abschneidet — und zwar *bevor* `kind`, `tag`, `sort` und
+`limit` greifen. In einem großen Buch ist „nichts gefunden“ nach einer breiten
+Query deshalb keine Aussage über den Bestand. Die Erweiterung muss ein solches
+Ergebnis als **unvollständig** kennzeichnen und darf es nie als „nicht
+vorhanden“ zeigen. Dasselbe gilt, wenn eine Antwort genau `limit` Zeilen lang
+ist. Der Wert steht als `RESEARCH_LIST.FTS_PREFILTER_CAP` in
+[src/shared/limits.js](src/shared/limits.js), die Auswertung in
+[src/shared/duplicates.js](src/shared/duplicates.js).
+
+**Dublettenprüfung geht über die URL, nicht über `q`.** Verglichen wird gegen
+`urls[].url` und `source` der Antwort. Beide Seiten laufen durch
+`serverNormalizeUrl` ([src/shared/url.js](src/shared/url.js)), einen
+zeichengenauen Nachbau von `lib/url-normalize.js`. Das reguläre `normalizeUrl`
+desselben Moduls taugt dafür **nicht** — es behält `www.`, das Schema und
+`#!`-Routen; siehe die offene Abweichung 8.
+
+Der Client ruft den Pfad über `api.listResearch()`
+([api-client.js](src/background/api-client.js)) auf, hinter der Fähigkeit
+`researchList` ([capabilities.js](src/background/capabilities.js)): ein Server
+ohne die Route antwortet mit dem HTML-404 von Express, dann bleibt die Prüfung
+einfach aus. `403 DEVICE_SCOPE_FORBIDDEN` ist dagegen ein Befund über das Token
+und wird gemeldet, nicht wiederholt — und färbt den globalen Token-Zustand
+nicht ein, weil das Erfassen davon unberührt bleibt.
+
+### Offene Abweichungen Client → Server
+
+Aus dem Abgleich vom 2026-08-01. Alle sind **clientseitig** zu beheben; keine
+davon verlangt eine Serveränderung. Wer eine erledigt, streicht sie hier.
+
+Die Punkte 1–7 sind am 2026-08-01 abgearbeitet. Sie bleiben mit Begründung
+stehen, weil jeder davon eine Regel hinterlässt, an die sich der nächste Abgleich
+halten soll — nicht als Aufgabenliste.
+
+1. ~~**`POST /sources/:id/pdf` existiert nicht.**~~ *Erledigt.* Der Endpunkt heißt
+   `doc` (`routes/sources-doc.js`); `api.uploadSourceDoc()` ruft ihn auf, mit
+   Dateiname als `?name=`. **Regel:** Pfade kommen aus der Vertragstabelle, nie
+   aus der Scope-Allowlist des Servers — die ist eine Rechte-Liste. Genau diese
+   Verwechslung hat den Phantom-Pfad erzeugt.
+2. ~~**Scope-Fehlercode.**~~ *Erledigt.* `DEVICE_SCOPE_FORBIDDEN` ist der einzige
+   Code, an dem `isScopeError` anschlägt; `CAPTURE_SCOPE_REQUIRED` ist aus Client,
+   Attrappen und Sprachdateien entfernt. Welcher Scope fehlt, sagt der Code nicht
+   — dafür trägt `ApiError.path` den Pfad.
+3. ~~**ACL-Codes.**~~ *Erledigt.* `NO_BOOK_ACCESS`, `INSUFFICIENT_ROLE` und
+   `INVALID_BOOK_ID` sind abgebildet, `BOOK_NOT_FOUND` und `BOOK_ACCESS_DENIED`
+   sind weg. `INSUFFICIENT_ROLE` nennt Ist- und Soll-Rolle aus `detail`, in
+   festgelegter Platzhalter-Reihenfolge (`SUBSTITUTION_FIELDS` in
+   [errors.js](src/shared/errors.js)) — sonst hinge die Meldung an der
+   Schlüsselreihenfolge des JSON.
+4. ~~**`/capture`-Payload ist unvollständig.**~~ *Erledigt.* `buildCapturePayload`
+   ([capture-runner.js](src/background/capture-runner.js)) überträgt alle Felder
+   der Vertragstabelle; ein Test vergleicht sie Feld für Feld gegen
+   `buildSourcePayload`, damit der bessere Weg nicht wieder das schlechtere
+   Ergebnis liefert.
+5. ~~**Antwortflags werden nicht gelesen.**~~ *Erledigt.* `research_created`,
+   `source_created` und `source_linked` landen in `job.progress`; das Popup
+   unterscheidet damit „angelegt" von „war schon drin". Ein `created` gibt es
+   nicht und gab es nie.
+6. ~~**Nicht abgebildete Fehlercodes.**~~ *Erledigt.* `ERROR_MESSAGE_KEYS` deckt
+   die Vertragstabelle vollständig ab; ein Test hält die Map gegen die Liste und
+   schlägt in beide Richtungen an — fehlender Code **und** erfundener Code.
+   Ein unbekannter Code fällt auf `err_unmapped_code` und **nennt sich selbst**,
+   damit der nächste Abgleich nicht wieder raten muss.
+7. ~~**Die Attrappen bilden den falschen Vertrag nach.**~~ *Erledigt.*
+   [test/helpers/mock-server.js](test/helpers/mock-server.js) spricht jetzt nur
+   Codes und Pfade des Vertrags und bildet zusätzlich die beiden HTML-Antworten
+   des Body-Parsers nach (413 ohne `error_code`, 400 bei kaputtem JSON) sowie das
+   stille Kürzen der Textfelder. [tools/review-server.mjs](tools/review-server.mjs)
+   zieht daraus. **Regel:** Die Attrappe ist der Vertrag, gegen den geprüft wird —
+   wer sie mit dem Client zusammen falsch macht, macht die Tests wertlos.
+8. **`normalizeUrl` ist nicht die Normalisierung des Servers.** Beim Bau des
+   Lesepfads aufgefallen: [url.js](src/shared/url.js) behält `www.`, das Schema
+   und `#!`-Routen und entfernt den Trailing-Slash nur beim leeren Pfad;
+   `lib/url-normalize.js` tut jeweils das Gegenteil. Außerdem streicht der
+   Client Parameter, die der Server stehen lässt (`ref_src`, `ref_url`, `trk`,
+   `spm`, Präfixe `mtm_`, `ga_`, `_hs`). Für die Dublettenprüfung ist das über
+   `serverNormalizeUrl` gelöst; **ungelöst** bleibt es dort, wo die Erweiterung
+   lokal vergleicht (Warteschlangen-Dubletten, Doppelklick-Schutz) — dort hält
+   sie zwei Adressen auseinander, die der Server verschmilzt. Die Zeile
+   „Geprüft und stimmig: … URL-Normalisierung" von zuvor war falsch.
+9. **Der Serverwechsel setzt die Fähigkeits-Befunde nicht zurück.**
+   `saveDetectedCapabilities({ capture: null, … })` in
+   [service-worker.js](src/background/service-worker.js) meint „zurücksetzen",
+   aber `pick()` in [state.js](src/background/state.js) liest `null` als „keine
+   Aussage" und behält den alten Wert. Nach einem Serverwechsel gelten deshalb
+   die Befunde des vorigen Servers weiter, bis die TTL von 24 h abläuft.
+   Bestand schon vorher; für den Lesepfad unverändert übernommen. Der saubere
+   Weg wäre ein eigenes `resetDetectedCapabilities()`.
+
+### Befund für das Mutterprojekt (nicht hier zu lösen)
+
+**Der dokumentierte Body von `POST /capture` führt kein `citekey`** — obwohl
+`409 CITEKEY_TAKEN` als Fehlercode *dieses* Endpunkts in der Tabelle steht. Beides
+zugleich kann nicht stimmen: entweder nimmt die Route einen `citekey` an und der
+Body-Vertrag ist unvollständig, oder sie nimmt keinen und der Fehlercode ist dort
+unerreichbar.
+
+Der Client tut nach der harten Regel das Konservative: liegt ein `citekey` vor,
+geht der Auftrag **nicht** über `/capture`, sondern über den Fallback-Pfad, wo
+`POST /sources` ihn nachweislich annimmt (`unifiedCaptureFits()` in
+[capture-runner.js](src/background/capture-runner.js), festgenagelt mit einem
+Test). Kein erfundenes Feld, kein stiller Datenverlust — aber ein Request mehr,
+solange die Frage offen ist. Sie gehört als Prompt ins Mutterprojekt, nach der
+Vorlage unten.
+
+---
+
+Erlaubt, aber ungenutzt: `GET /research/tags`, `GET /sources`,
+`GET /sources/{pool,stats}`. `GET /research` ist seit dem 2026-08-01 in Gebrauch.
+
+Geprüft und **stimmig**: Titel 300, Text 20 000, `source` 1 000, Tags 60/20,
+URLs 2 000/20, URL-Label 300, Anhang-Dateiname 200, JSON-Body von `/capture`
+256 kB, Bild 12 MB, PDF 25 MB, die elf `csl_type`-Werte, `401 NOT_LOGGED_IN`,
+`409 CITEKEY_TAKEN`, `limit` 50/200, FTS-Vorfilter 500.
+
+**Zwei Sorten Grenze, und die Unterscheidung ist der Punkt** (siehe
+[limits.js](src/shared/limits.js)):
+
+- **Textfelder kürzt der Server still** und antwortet 2xx. Der Client kürzt
+  deshalb vorher auf dieselben Längen und sagt es im Popup — sonst quittiert er
+  einen Text, der so nie gespeichert wurde. Einzige Ausnahme ist die
+  Wortlauttreue: ein markiertes Zitat über 20 000 Zeichen wird **abgelehnt**,
+  nicht beschnitten.
+- **Uploads und der JSON-Body laufen in den Body-Parser.** Der Server hat keinen
+  globalen Express-Fehler-Handler, also antwortet der Parser mit Express' Default:
+  **HTML ohne `error_code`** — 413 bei zu großem Körper, 400 bei kaputtem JSON.
+  `res.json()` ist auf diesem Pfad verboten; der Client prüft Größen **vor** dem
+  Request und fällt sonst auf den HTTP-Status zurück.
+
+  Folge, die leicht zu übersehen ist: **`DOC_TOO_LARGE` wird in der Praxis nie
+  ankommen.** Parser-Limit und Server-Limit liegen beide bei 25 MB, der Parser
+  gewinnt. Wer nur auf diesen Code prüft, fängt den Fall nie.
 
 ---
 

@@ -42,10 +42,11 @@ import {
 } from '../shared/config.js';
 import { ApiError, describeError } from '../shared/errors.js';
 import { t } from '../shared/i18n.js';
+import { summarizeDuplicates } from '../shared/duplicates.js';
 import { intentFromHarvest } from '../shared/intent.js';
-import { LIMITS } from '../shared/limits.js';
+import { LIMITS, RESEARCH_LIST } from '../shared/limits.js';
 import { MSG } from '../shared/messages.js';
-import { normalizeServerUrl, toOriginPattern } from '../shared/url.js';
+import { fileNameFromUrl, normalizeServerUrl, toOriginPattern } from '../shared/url.js';
 
 const QUEUE_ALARM = 'schreibwerkstatt-queue';
 const CONTEXT_MENU_QUOTE = 'schreibwerkstatt-capture-quote';
@@ -82,6 +83,40 @@ const queue = createQueue({
 
 /** Verhindert, dass zwei Wecker gleichzeitig dieselbe Queue abarbeiten. */
 let processing = false;
+
+/**
+ * Was beim letzten Durchlauf mit einem Auftrag passiert ist.
+ *
+ * Ein erfolgreicher Auftrag verlaesst die Queue — sein `progress` waere danach
+ * nicht mehr abfragbar. Genau der traegt aber die Antwortflags des Servers
+ * (`source_created`, `research_created`), und ohne die kann das Popup nicht
+ * sagen „war schon in der Bibliothek". Also hier kurz zwischenlagern, bis die
+ * Antwort auf `SUBMIT_CAPTURE` sie abgeholt hat.
+ *
+ * @type {Map<string, import('../shared/config.js').CaptureProgress>}
+ */
+const lastOutcome = new Map();
+
+/**
+ * Auftraege aus dem Kontextmenue holt niemand ab — dort gibt es kein Popup, das
+ * auf eine Antwort wartet. Ohne Deckel wuechse die Ablage bis zum Ende der
+ * Worker-Lebensdauer.
+ */
+const LAST_OUTCOME_MAX = 20;
+
+/**
+ * @param {string} jobId
+ * @param {import('../shared/config.js').CaptureProgress} progress
+ */
+function rememberOutcome(jobId, progress) {
+  lastOutcome.set(jobId, { ...progress });
+  // Map haelt die Einfuegereihenfolge — der aelteste Eintrag geht zuerst.
+  while (lastOutcome.size > LAST_OUTCOME_MAX) {
+    const oldest = lastOutcome.keys().next().value;
+    if (oldest === undefined) break;
+    lastOutcome.delete(oldest);
+  }
+}
 
 /**
  * Anhaenge (Screenshot, PDF) NUR im Arbeitsspeicher.
@@ -149,7 +184,7 @@ async function setBadge(text, color, title) {
  * Nutzer ausgeloesten Aktion.
  *
  * @param {boolean} [allowProbe]
- * @returns {Promise<{capture: boolean, byUrl: boolean}>}
+ * @returns {Promise<{capture: boolean, byUrl: boolean, researchList: boolean, researchScopeMissing: boolean}>}
  */
 async function resolveCapabilities(allowProbe = true) {
   let capabilities = await getCapabilities();
@@ -157,6 +192,7 @@ async function resolveCapabilities(allowProbe = true) {
   const needsProbe =
     (capabilities.capture.mode === 'auto' && capabilities.capture.detected === null) ||
     (capabilities.byUrl.mode === 'auto' && capabilities.byUrl.detected === null) ||
+    (capabilities.researchList.mode === 'auto' && capabilities.researchList.detected === null) ||
     Date.now() - (capabilities.probedAt || 0) > CAPABILITY_TTL_MS;
 
   if (allowProbe && needsProbe) {
@@ -175,17 +211,93 @@ async function resolveCapabilities(allowProbe = true) {
   return {
     capture: capabilityEnabled(capabilities.capture),
     byUrl: capabilityEnabled(capabilities.byUrl),
+    researchList: capabilityEnabled(capabilities.researchList),
+    researchScopeMissing: !!capabilities.researchList.scopeMissing,
   };
 }
 
-/** @param {'capture'|'byUrl'} name */
+/** @param {'capture'|'byUrl'|'researchList'} name */
 function markCapabilityMissing(name) {
   void getCapabilities().then((capabilities) =>
     saveDetectedCapabilities({
       capture: name === 'capture' ? false : capabilities.capture.detected,
       byUrl: name === 'byUrl' ? false : capabilities.byUrl.detected,
+      researchList: name === 'researchList' ? false : capabilities.researchList.detected,
     }),
   );
+}
+
+// ---------------------------------------------------------------------------
+// Dublettenpruefung
+// ---------------------------------------------------------------------------
+
+/**
+ * „Habe ich diese Quelle schon?" — ueber `GET /sources/by-url`.
+ *
+ * @param {{byUrl: boolean}} capabilities
+ * @param {{url: string, bookId?: number|string|null}} message
+ */
+async function checkSourceDuplicate(capabilities, message) {
+  if (!capabilities.byUrl) return { supported: false };
+  try {
+    const found = await api.findSourceByUrl(message.url, message.bookId ?? '');
+    return { supported: true, found: true, source: found.source, linkedToBook: !!found.linked_to_book };
+  } catch (error) {
+    const err = /** @type {any} */ (error);
+    if (err.status === 404) return { supported: true, found: false };
+    if ((err.status === 404 || err.status === 405) && err.jsonBody !== true) {
+      markCapabilityMissing('byUrl');
+      return { supported: false };
+    }
+    throw error;
+  }
+}
+
+/**
+ * „Habe ich diese SEITE in diesem Buch schon erfasst?" — ueber `GET /research`.
+ *
+ * Gefragt wird nach dem Buch, nicht nach einem Textbegriff: `q` wuerde den
+ * FTS5-Vorfilter des Servers anwerfen, dessen 500er-Deckel VOR Filter und
+ * Sortierung greift. Verglichen wird die URL, siehe `shared/duplicates.js`.
+ *
+ * Der Aufruf ist Komfort und darf das Erfassen nie blockieren — deshalb wird
+ * jeder Fehler zu einem Befund, nicht zu einer Ausnahme.
+ *
+ * @param {{researchList: boolean, researchScopeMissing: boolean}} capabilities
+ * @param {{url: string, bookId?: number|string|null}} message
+ */
+async function checkResearchDuplicate(capabilities, message) {
+  if (!message.bookId) return { supported: false };
+  if (!capabilities.researchList) {
+    return { supported: false, scopeMissing: capabilities.researchScopeMissing };
+  }
+
+  try {
+    const items = await api.listResearch({
+      bookId: message.bookId,
+      sort: 'updated',
+      limit: RESEARCH_LIST.LIMIT_MAX,
+    });
+    return {
+      supported: true,
+      ...summarizeDuplicates({ items, url: message.url, limit: RESEARCH_LIST.LIMIT_MAX }),
+    };
+  } catch (error) {
+    const err = /** @type {any} */ (error);
+
+    if ((err.status === 404 || err.status === 405) && err.jsonBody !== true) {
+      markCapabilityMissing('researchList');
+      return { supported: false };
+    }
+
+    // Fehlender Scope ist ein Befund ueber das Token: melden, nicht wiederholen.
+    if (err.status === 403 && err.code === 'DEVICE_SCOPE_FORBIDDEN') {
+      void saveDetectedCapabilities({ researchList: true, researchScopeMissing: true });
+      return { supported: false, scopeMissing: true, error: describeError(err, t) };
+    }
+
+    return { supported: false, error: describeError(err, t) };
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -339,6 +451,7 @@ async function processQueue() {
           capabilities,
           onCapabilityMissing: markCapabilityMissing,
         });
+        rememberOutcome(job.id, job.progress);
         await queue.complete(job.id);
         attachmentCache.delete(job.id);
         await notifySuccess(job);
@@ -606,15 +719,11 @@ async function handleMessage(message, sender) {
 
     case MSG.CHECK_DUPLICATE: {
       const capabilities = await resolveCapabilities(true);
-      if (!capabilities.byUrl) return { supported: false };
-      try {
-        const found = await api.findSourceByUrl(message.url, message.bookId ?? '');
-        return { supported: true, found: true, source: found.source, linkedToBook: !!found.linked_to_book };
-      } catch (error) {
-        const err = /** @type {any} */ (error);
-        if (err.status === 404) return { supported: true, found: false };
-        throw error;
-      }
+      const [source, research] = await Promise.all([
+        checkSourceDuplicate(capabilities, message),
+        checkResearchDuplicate(capabilities, message),
+      ]);
+      return { source, research };
     }
 
     case MSG.LOOKUP_METADATA:
@@ -637,7 +746,13 @@ async function handleMessage(message, sender) {
       if (message.attachPdf && message.pdfUrl && message.tabId !== undefined) {
         const result = await fetchPdfInPage(message.tabId, message.pdfUrl);
         if (result.base64) {
-          attachments.pdf = { bytes: result.base64, size: result.size };
+          attachments.pdf = {
+            bytes: result.base64,
+            size: result.size,
+            // Der Vertrag nimmt den Dateinamen als `?name=`; ohne ihn heisst der
+            // Anhang in der App nur „Dokument".
+            name: fileNameFromUrl(message.pdfUrl),
+          };
         } else {
           return { queued: false, pdfError: result.error || 'FETCH_FAILED' };
         }
@@ -664,11 +779,16 @@ async function handleMessage(message, sender) {
       await processQueue();
       const remaining = await queue.list();
       const stillThere = remaining.find((entry) => entry.id === job.id);
+      const outcome = lastOutcome.get(job.id) || null;
+      lastOutcome.delete(job.id);
       return {
         queued: true,
         jobId: job.id,
         done: !stillThere,
         job: stillThere || null,
+        // Was der Server gemeldet hat — damit das Popup „angelegt" von
+        // „war schon drin" unterscheiden kann.
+        outcome,
       };
     }
 
@@ -710,7 +830,12 @@ async function handleMessage(message, sender) {
         [STORAGE_KEYS.BOOKS]: [],
         [STORAGE_KEYS.BOOKS_FETCHED_AT]: 0,
       });
-      await saveDetectedCapabilities({ capture: null, byUrl: null });
+      await saveDetectedCapabilities({
+        capture: null,
+        byUrl: null,
+        researchList: null,
+        researchScopeMissing: false,
+      });
       await refreshBadge();
       return { serverUrl, originPattern: toOriginPattern(serverUrl), tokenLooksValid: token.startsWith(TOKEN_PREFIX) };
     }

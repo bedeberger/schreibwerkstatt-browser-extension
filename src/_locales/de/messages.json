@@ -90,31 +90,124 @@
     "message": "Erlaubt sind $1 Zeichen, markiert waren $2."
   },
   "err_not_logged_in": {
-    "message": "Das Geräte-Token gilt nicht mehr. Erzeuge in der Web-App ein neues."
+    "message": "Das Geräte-Token gilt nicht mehr — es ist abgelaufen oder wurde widerrufen. Erzeuge in der Web-App ein neues und trage es hier ein."
   },
-  "err_capture_scope_required": {
-    "message": "Dieses Token darf nicht erfassen. Erzeuge in der Web-App ein Token mit Erfassungs-Berechtigung."
+  "err_device_scope_forbidden": {
+    "message": "Dieses Token darf das nicht. Es wurde als Erfassungs-Token ausgestellt (Art „Erfassung“, kind: 'capture') und kommt nur an die dafür freigegebenen Pfade. Ein passendes Token gibt es in der Web-App unter Einstellungen → Geräte."
+  },
+  "err_demo_token_fixed": {
+    "message": "Dieses Demo-Token ist fest eingetragen und lässt sich nicht über die Oberfläche entziehen."
+  },
+  "err_no_book_access": {
+    "message": "Auf dieses Buch hast du keinen Zugriff — oder es gibt es nicht. Der Server unterscheidet das absichtlich nicht."
+  },
+  "err_insufficient_role": {
+    "message": "Du darfst dieses Buch nur lesen (Rolle: $1). Zum Erfassen brauchst du $2-Rechte — die vergibt der Eigentümer des Buchs."
+  },
+  "err_invalid_id": {
+    "message": "Die Buch-Angabe fehlt oder ist ungültig."
+  },
+  "err_bookid_req": {
+    "message": "Ohne Buch geht es nicht. Bitte ein Buch wählen."
+  },
+  "err_invalid_value": {
+    "message": "Der Server nimmt diesen Wert für „$1“ nicht an. Erlaubt ist: $2."
+  },
+  "err_invalid_url": {
+    "message": "Diese Adresse kann der Server nicht verarbeiten. Sie muss mit http:// oder https:// beginnen."
+  },
+  "err_empty": {
+    "message": "Ein Fundstück braucht mindestens einen Titel, einen Text oder eine URL."
   },
   "err_source_identity_req": {
     "message": "Eine Quelle braucht mindestens einen Titel oder eine Person."
   },
   "err_citekey_taken": {
-    "message": "Dieser Zitierschlüssel ist schon vergeben."
+    "message": "Der Zitierschlüssel „$1“ ist in deiner Bibliothek schon vergeben."
   },
-  "err_book_not_found": {
-    "message": "Dieses Buch gibt es nicht (mehr)."
+  "err_item_not_found": {
+    "message": "Das Fundstück, an das der Anhang gehört, gibt es auf dem Server nicht."
   },
-  "err_book_access_denied": {
-    "message": "In dieses Buch darfst du nicht schreiben."
+  "err_no_image": {
+    "message": "Der Server hat kein Bild erkannt — der Anhang war leer oder hatte den falschen Typ."
   },
-  "err_forbidden": {
-    "message": "Der Server hat den Zugriff verweigert."
+  "err_image_invalid": {
+    "message": "Der Server konnte dieses Bild nicht lesen."
   },
-  "err_validation_failed": {
-    "message": "Der Server hat die Angaben abgelehnt."
+  "err_no_doc": {
+    "message": "Der Server hat kein PDF erkannt — der Anhang war leer oder hatte den falschen Typ."
+  },
+  "err_doc_too_large": {
+    "message": "Das PDF ist größer als die erlaubten 25 MB."
+  },
+  "err_doc_not_pdf": {
+    "message": "Diese Datei ist kein PDF."
+  },
+  "err_doc_unreadable": {
+    "message": "Der Server konnte dieses PDF nicht lesen — es ist verschlüsselt oder beschädigt."
+  },
+  "err_not_source_owner": {
+    "message": "Diese Quelle gehört einem anderen Konto. Ändern darf sie nur, wer sie in seiner Bibliothek hat."
+  },
+  "err_url_req": {
+    "message": "Für diese Abfrage fehlt die Adresse."
+  },
+  "err_lookup_param_required": {
+    "message": "Für die Abfrage braucht es einen DOI oder eine ISBN."
+  },
+  "err_lookup_param_ambiguous": {
+    "message": "Bitte entweder DOI oder ISBN angeben, nicht beides."
+  },
+  "err_invalid_doi": {
+    "message": "Dieser DOI ist nicht lesbar."
+  },
+  "err_invalid_isbn": {
+    "message": "Diese ISBN ist nicht lesbar."
+  },
+  "err_lookup_not_found": {
+    "message": "Das Verzeichnis kennt diese Kennung nicht. Die Angaben bleiben so, wie sie sind."
+  },
+  "err_lookup_unavailable": {
+    "message": "Das Verzeichnis (Crossref bzw. OpenLibrary) ist gerade nicht erreichbar."
+  },
+  "err_lookup_failed": {
+    "message": "Das Verzeichnis hat geantwortet, aber unbrauchbar."
+  },
+  "err_no_server_configured": {
+    "message": "Es ist noch keine Server-Adresse eingetragen."
+  },
+  "err_no_token_configured": {
+    "message": "Es ist noch kein Geräte-Token eingetragen."
+  },
+  "err_client_validation_failed": {
+    "message": "Die Angaben sind unvollständig — nicht gesendet."
+  },
+  "err_client_image_too_large": {
+    "message": "Der Screenshot ist größer als die erlaubten 12 MB."
+  },
+  "err_client_doc_too_large": {
+    "message": "Das PDF ist größer als die erlaubten 25 MB — nicht gesendet."
+  },
+  "err_client_payload_too_large": {
+    "message": "Der Eintrag ist zu groß für einen einzelnen Aufruf."
+  },
+  "err_harvest_failed": {
+    "message": "Diese Seite lässt sich nicht auslesen. Bei Chrome-eigenen Seiten und im Web Store ist das normal."
+  },
+  "err_no_active_tab": {
+    "message": "Kein aktiver Tab gefunden."
+  },
+  "err_invalid_server_url": {
+    "message": "Diese Server-Adresse ist nicht verwendbar."
+  },
+  "err_unknown_message": {
+    "message": "Interner Fehler der Erweiterung: unbekannte Anfrage."
+  },
+  "err_unmapped_code": {
+    "message": "Der Server hat einen Fehler gemeldet, den diese Version der Erweiterung nicht kennt (HTTP $2): $1"
   },
   "err_payload_too_large": {
-    "message": "Die Daten sind zu groß für den Server."
+    "message": "Der Server hat die Übertragung abgebrochen, weil sie zu groß war. Grenzen: Bild 12 MB, PDF 25 MB."
   },
   "err_unsupported_media_type": {
     "message": "Dieses Dateiformat nimmt der Server nicht an."
@@ -296,6 +389,36 @@
   "popup_truncated_hint": {
     "message": "Auf $1 Zeichen gekürzt (Original: $2). An einer Satzgrenze getrennt."
   },
+  "popup_clamp_hint": {
+    "message": "Der Server kürzt beim Speichern still — diese Angaben gehen gekürzt hinaus: $1"
+  },
+  "popup_clamp_field": {
+    "message": "$1 (auf $2 gekürzt, jetzt $3)"
+  },
+  "popup_clamp_title": {
+    "message": "Titel"
+  },
+  "popup_clamp_body": {
+    "message": "Text"
+  },
+  "popup_clamp_source": {
+    "message": "Herkunfts-URL"
+  },
+  "popup_clamp_tags": {
+    "message": "Schlagwörter"
+  },
+  "popup_clamp_urls": {
+    "message": "Weitere Links"
+  },
+  "popup_clamp_url": {
+    "message": "URL der Quelle"
+  },
+  "popup_saved_source_existed": {
+    "message": "Die Quelle war schon in deiner Bibliothek und wurde nur mit dem Buch verknüpft."
+  },
+  "popup_saved_research_existed": {
+    "message": "Dieses Fundstück lag schon vor — der Server hat den Doppelklick erkannt."
+  },
   "popup_source_details": {
     "message": "Angaben zur Quelle"
   },
@@ -376,6 +499,18 @@
   },
   "popup_duplicate_in_library": {
     "message": "Diese Quelle ist schon in deiner Bibliothek, aber nicht in diesem Buch."
+  },
+  "popup_duplicate_research": {
+    "message": "Zu dieser Seite gibt es in diesem Buch schon $1 Eintrag/Einträge."
+  },
+  "popup_duplicate_incomplete_limit": {
+    "message": "Geprüft wurden nur die $1 zuletzt geänderten Einträge – ältere Dubletten kann die Prüfung nicht ausschließen."
+  },
+  "popup_duplicate_incomplete_fts": {
+    "message": "Die Suche des Servers bricht nach $1 Treffern ab – „nichts gefunden“ heißt hier nicht „nicht vorhanden“."
+  },
+  "popup_duplicate_scope_missing": {
+    "message": "Dublettenprüfung nicht möglich: dem Gerätetoken fehlt die Leseberechtigung (DEVICE_SCOPE_FORBIDDEN)."
   },
   "popup_submit": {
     "message": "Senden"
@@ -580,6 +715,9 @@
   },
   "options_cap_unknown": {
     "message": "unbekannt"
+  },
+  "options_cap_research_scope_missing": {
+    "message": "GET /research ist vorhanden, aber dieses Gerätetoken darf nicht lesen (DEVICE_SCOPE_FORBIDDEN). Die Dublettenprüfung bleibt deshalb aus."
   },
   "options_cap_probed": {
     "message": "Zuletzt geprüft $1."

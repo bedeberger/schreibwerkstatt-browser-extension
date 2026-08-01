@@ -3,12 +3,18 @@ import { describe, it } from 'node:test';
 
 import {
   LIMITS,
+  clampAttachmentName,
+  clampCapturePayload,
+  clampResearchPayload,
+  clampSourcePayload,
+  jsonByteLength,
   validateBinarySize,
   validateResearchPayload,
   validateSourcePayload,
 } from '../src/shared/limits.js';
 
 const keys = (problems) => problems.map((problem) => problem.key);
+const fields = (truncations) => truncations.map((entry) => entry.field);
 
 describe('validateResearchPayload', () => {
   it('nimmt eine gueltige Payload an', () => {
@@ -39,15 +45,27 @@ describe('validateResearchPayload', () => {
     );
   });
 
-  it('prueft die Titellaenge gegen 300', () => {
-    const problems = validateResearchPayload({ book_id: 1, title: 'x'.repeat(301) });
-    assert.deepEqual(keys(problems), ['validation_title_too_long']);
-    assert.deepEqual(problems[0].params, { max: 300, actual: 301 });
+  it('beanstandet einen zu langen Titel NICHT — der Server kuerzt ihn still', () => {
+    // Der Server lehnt nicht ab, er schneidet ab und antwortet 2xx. Also wird
+    // hier nichts beanstandet; gekuerzt wird in `clampResearchPayload`, und der
+    // Nutzer sieht es vorher.
+    assert.deepEqual(keys(validateResearchPayload({ book_id: 1, title: 'x'.repeat(301) })), []);
   });
 
-  it('prueft die Textlaenge gegen 20000', () => {
-    const problems = validateResearchPayload({ book_id: 1, body: 'x'.repeat(LIMITS.BODY_MAX + 1) });
+  it('beanstandet einen zu langen Fliesstext NICHT', () => {
+    assert.deepEqual(
+      keys(validateResearchPayload({ book_id: 1, kind: 'link', body: 'x'.repeat(LIMITS.BODY_MAX + 1) })),
+      [],
+    );
+  });
+
+  it('ein zu langes ZITAT wird dagegen abgelehnt — Wortlaut wird nie beschnitten', () => {
+    const problems = validateResearchPayload(
+      { book_id: 1, kind: 'quote', body: 'x'.repeat(LIMITS.BODY_MAX + 1) },
+      { verbatimBody: true },
+    );
     assert.deepEqual(keys(problems), ['validation_body_too_long']);
+    assert.deepEqual(problems[0].params, { max: LIMITS.BODY_MAX, actual: LIMITS.BODY_MAX + 1 });
   });
 
   it('prueft die Art', () => {
@@ -108,6 +126,136 @@ describe('validateSourcePayload', () => {
     assert.deepEqual(validateSourcePayload({ ...base, year: 2019 }), []);
     assert.deepEqual(validateSourcePayload({ ...base, year: null }), []);
     assert.deepEqual(validateSourcePayload({ ...base, year: '' }), []);
+  });
+});
+
+describe('clampResearchPayload', () => {
+  it('laesst eine Payload innerhalb der Grenzen unberuehrt', () => {
+    const input = { title: 'Titel', body: 'Text', source: 'https://example.org', tags: ['eis'] };
+    const { payload, truncations } = clampResearchPayload(input);
+    assert.deepEqual(truncations, []);
+    assert.deepEqual(payload, input);
+  });
+
+  it('aendert die uebergebene Payload nicht — das Popup rechnet damit nur vor', () => {
+    const input = { title: 'x'.repeat(400) };
+    clampResearchPayload(input);
+    assert.equal(input.title.length, 400);
+  });
+
+  it('kuerzt Titel auf 300 und meldet die Originallaenge', () => {
+    const { payload, truncations } = clampResearchPayload({ title: 'x'.repeat(400) });
+    assert.equal(payload.title.length, LIMITS.TITLE_MAX);
+    assert.deepEqual(truncations, [{ field: 'title', max: 300, actual: 400 }]);
+  });
+
+  it('kuerzt hart, nicht an der Satzgrenze — der Server tut es auch so', () => {
+    const { payload } = clampResearchPayload({ title: `${'a'.repeat(299)}. Noch ein Satz.` });
+    assert.equal(payload.title, `${'a'.repeat(299)}.`);
+  });
+
+  it('kuerzt den Fliesstext auf 20000', () => {
+    const { payload, truncations } = clampResearchPayload({ body: 'x'.repeat(20001) });
+    assert.equal(payload.body.length, LIMITS.BODY_MAX);
+    assert.deepEqual(fields(truncations), ['body']);
+  });
+
+  it('laesst einen Wortlaut in Ruhe, wenn verbatimBody gesetzt ist', () => {
+    const body = 'x'.repeat(20001);
+    const { payload, truncations } = clampResearchPayload({ body }, { verbatimBody: true });
+    assert.equal(payload.body, body, 'ein Zitat wird nie beschnitten');
+    assert.deepEqual(truncations, []);
+  });
+
+  it('kuerzt `source` auf 1000 — das Feld hatte bisher gar keine Grenze', () => {
+    const { payload, truncations } = clampResearchPayload({ source: `https://example.org/${'a'.repeat(2000)}` });
+    assert.equal(payload.source.length, LIMITS.SOURCE_MAX);
+    assert.deepEqual(fields(truncations), ['source']);
+  });
+
+  it('kappt Tags bei 20 Stueck und 60 Zeichen', () => {
+    const { payload, truncations } = clampResearchPayload({
+      tags: Array.from({ length: 25 }, (_, i) => (i === 0 ? 'y'.repeat(80) : `tag${i}`)),
+    });
+    assert.equal(payload.tags.length, LIMITS.TAGS_MAX);
+    assert.equal(payload.tags[0].length, LIMITS.TAG_MAX);
+    // Zwei Befunde: zu viele Tags UND ein zu langer Tag.
+    assert.deepEqual(fields(truncations), ['tags', 'tags']);
+  });
+
+  it('kappt urls bei 20 Stueck, die URL bei 2000 und das Label bei 300', () => {
+    const { payload, truncations } = clampResearchPayload({
+      urls: Array.from({ length: 22 }, (_, i) => ({
+        url: i === 0 ? `https://example.org/${'a'.repeat(2500)}` : `https://example.org/${i}`,
+        label: i === 0 ? 'L'.repeat(400) : '',
+      })),
+    });
+    assert.equal(payload.urls.length, LIMITS.URLS_MAX);
+    assert.equal(payload.urls[0].url.length, LIMITS.URL_MAX);
+    assert.equal(payload.urls[0].label.length, LIMITS.URL_LABEL_MAX);
+    assert.deepEqual(fields(truncations), ['urls', 'urls']);
+  });
+});
+
+describe('clampSourcePayload', () => {
+  it('kuerzt Titel und URL', () => {
+    const { payload, truncations } = clampSourcePayload({
+      title: 'x'.repeat(400),
+      url: `https://example.org/${'a'.repeat(2500)}`,
+    });
+    assert.equal(payload.title.length, LIMITS.TITLE_MAX);
+    assert.equal(payload.url.length, LIMITS.URL_MAX);
+    assert.deepEqual(fields(truncations), ['title', 'url']);
+  });
+
+  it('erfindet keine Grenze fuer Felder, die keine dokumentierte haben', () => {
+    // `container_title`, `publisher`, `place` und `note` bleiben, wie sie sind —
+    // eine geratene Grenze waere eine Annahme, kein gespiegelter Vertrag.
+    const long = 'x'.repeat(5000);
+    const { payload, truncations } = clampSourcePayload({
+      title: 'Titel',
+      container_title: long,
+      publisher: long,
+      place: long,
+      note: long,
+    });
+    assert.deepEqual(truncations, []);
+    assert.equal(payload.note.length, 5000);
+    assert.equal(payload.container_title.length, 5000);
+  });
+});
+
+describe('clampCapturePayload', () => {
+  it('wendet beide Regelwerke an und meldet `title` nur einmal', () => {
+    const { payload, truncations } = clampCapturePayload({
+      title: 'x'.repeat(400),
+      body: 'y'.repeat(20001),
+      url: `https://example.org/${'a'.repeat(2500)}`,
+    });
+    assert.equal(payload.title.length, LIMITS.TITLE_MAX);
+    assert.equal(payload.body.length, LIMITS.BODY_MAX);
+    assert.equal(payload.url.length, LIMITS.URL_MAX);
+    assert.deepEqual(fields(truncations), ['title', 'body', 'url']);
+  });
+});
+
+describe('clampAttachmentName', () => {
+  it('kuerzt auf 200 Zeichen', () => {
+    assert.equal(clampAttachmentName(`${'n'.repeat(250)}.pdf`).length, LIMITS.DOC_NAME_MAX);
+  });
+
+  it('vertraegt fehlende Angaben', () => {
+    assert.equal(clampAttachmentName(undefined), '');
+    assert.equal(clampAttachmentName('  bericht.pdf '), 'bericht.pdf');
+  });
+});
+
+describe('jsonByteLength', () => {
+  it('zaehlt Bytes, nicht Zeichen — der Body-Parser tut es auch', () => {
+    // Ein Umlaut wiegt in UTF-8 zwei Bytes. Wer Zeichen zaehlt, unterschaetzt
+    // die 256-kB-Grenze von `POST /capture`.
+    assert.equal(jsonByteLength({ a: 'ae' }), JSON.stringify({ a: 'ae' }).length);
+    assert.ok(jsonByteLength({ a: 'ä'.repeat(100) }) > JSON.stringify({ a: 'ä'.repeat(100) }).length);
   });
 });
 

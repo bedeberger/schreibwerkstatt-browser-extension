@@ -1,0 +1,57 @@
+# Reiner Pruef-Lauf: Tests und Build, kein Deploy.
+#
+# Der Nutzen liegt nicht darin, dass die Tests laufen — die muessen laut
+# CLAUDE.md vor jedem Commit lokal gruen sein. Er liegt im *frischen Klon*:
+# hier baut nur, was wirklich in Git liegt. Eine vergessene, nicht getrackte
+# Datei ist lokal unsichtbar und faellt genau an dieser Stelle auf.
+#
+# Kein Release-Schritt: das ZIP entsteht ueber `/release` lokal, der Upload in
+# den Chrome Web Store ist ohnehin Handarbeit (store/PUBLISHING.md).
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+# Nichts wird geschrieben, kein Secret gebraucht: die Tests kommen ohne Netz
+# und ohne Server aus.
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Tests + Build (Node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    strategy:
+      # Ein Bruch auf einer Version soll die andere trotzdem zu Ende laufen
+      # lassen — sonst weiss man nicht, ob es die Version war oder der Code.
+      fail-fast: false
+      matrix:
+        # Untergrenze aus `engines` und aktuelles LTS. Was dazwischen liegt,
+        # bringt keinen zusaetzlichen Befund.
+        node: ['20', '24']
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+
+      # `npm ci` statt `npm install`: schlaegt an, wenn package-lock.json nicht
+      # zu package.json passt.
+      - run: npm ci
+
+      - run: npm test
+
+      # Baut nach dist/. Faengt fehlende Importe und nicht getrackte Dateien,
+      # die die Tests nicht beruehren.
+      - run: npm run build

@@ -197,7 +197,7 @@ describe('Warteschlange', () => {
   it('nextWakeAt ignoriert endgueltig gescheiterte Auftraege', async () => {
     const { queue } = makeQueue();
     const job = await queue.add(intent());
-    await queue.fail(job.id, new ApiError({ status: 403, code: 'CAPTURE_SCOPE_REQUIRED' }));
+    await queue.fail(job.id, new ApiError({ status: 403, code: 'DEVICE_SCOPE_FORBIDDEN' }));
     assert.equal(await queue.nextWakeAt(), null);
   });
 

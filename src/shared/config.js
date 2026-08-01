@@ -43,6 +43,12 @@ export const DEFAULT_CAPABILITIES = Object.freeze({
   capture: { mode: CAPABILITY_MODE.AUTO, detected: null },
   /** `GET /sources/by-url` — Doppelklick-Schutz. */
   byUrl: { mode: CAPABILITY_MODE.AUTO, detected: null },
+  /**
+   * `GET /research` — Lesepfad fuer die Dublettenpruefung.
+   * `scopeMissing` haelt fest, dass der Endpunkt zwar da ist, dem Token aber
+   * `content:read` fehlt. Das ist ein Konfigurationsbefund, kein Ausfall.
+   */
+  researchList: { mode: CAPABILITY_MODE.AUTO, detected: null, scopeMissing: false },
   probedAt: 0,
 });
 
@@ -129,12 +135,23 @@ export const JOB_STATE = Object.freeze({
  */
 
 /**
+ * Fortschritt eines Auftrags.
+ *
+ * Die drei `…Created`/`…Linked`-Flags spiegeln die Antwortflags des Vertrags
+ * (`research_created`, `source_created`, `source_linked`). Sie sind die einzige
+ * Grundlage fuer die Auskunft „war schon drin": `false` heisst
+ * wiederverwendet, nicht gescheitert. `null` heisst „noch nichts unternommen".
+ *
  * @typedef {object} CaptureProgress
  * @property {number|string|null} researchItemId
  * @property {number|string|null} sourceId
  * @property {Array<number|string>} linkedBookIds
  * @property {boolean} imageUploaded
  * @property {boolean} pdfUploaded
+ * @property {boolean|null} [researchCreated]
+ * @property {boolean|null} [sourceCreated]
+ * @property {boolean|null} [sourceLinked]
+ * @property {boolean} [attachmentsLost]
  * @property {'capture'|'split'|null} via
  */
 
@@ -160,6 +177,10 @@ export function withDefaults(stored = {}) {
       byUrl: {
         ...DEFAULT_CAPABILITIES.byUrl,
         ...((stored[STORAGE_KEYS.CAPABILITIES] || {}).byUrl || {}),
+      },
+      researchList: {
+        ...DEFAULT_CAPABILITIES.researchList,
+        ...((stored[STORAGE_KEYS.CAPABILITIES] || {}).researchList || {}),
       },
     },
     [STORAGE_KEYS.QUEUE]: Array.isArray(stored[STORAGE_KEYS.QUEUE]) ? stored[STORAGE_KEYS.QUEUE] : [],

@@ -12,7 +12,16 @@
  */
 
 import { ApiError } from '../shared/errors.js';
-import { validateResearchPayload, validateSourcePayload } from '../shared/limits.js';
+import {
+  LIMITS,
+  clampCapturePayload,
+  clampResearchPayload,
+  clampSourcePayload,
+  jsonByteLength,
+  validateBinarySize,
+  validateResearchPayload,
+  validateSourcePayload,
+} from '../shared/limits.js';
 
 /**
  * @typedef {object} RunContext
@@ -54,19 +63,20 @@ export async function runCaptureJob(job, ctx) {
 
   const untouched = !progress.researchItemId && !progress.sourceId;
 
-  if (capabilities.capture && untouched) {
+  if (capabilities.capture && untouched && unifiedCaptureFits(intent)) {
     const done = await tryUnifiedCapture(job, ctx);
     if (done) return progress;
   }
 
   // -------------------------------------------------------------- Recherche
   if (wantsResearch(intent.mode) && !progress.researchItemId) {
-    const payload = buildResearchPayload(intent);
-    const problems = validateResearchPayload(payload);
+    const { payload } = buildResearchPayload(intent);
+    const problems = validateResearchPayload(payload, { verbatimBody: isVerbatim(intent) });
     if (problems.length) throwValidation(problems);
 
     const item = await api.createResearchItem(payload);
     progress.researchItemId = item && (item.id ?? item.research_item?.id) ? (item.id ?? item.research_item.id) : null;
+    progress.researchCreated = true;
     progress.via = progress.via || 'split';
     log('research-created', { id: progress.researchItemId });
   }
@@ -85,6 +95,7 @@ export async function runCaptureJob(job, ctx) {
   ) {
     await api.linkSource(progress.sourceId, intent.bookId);
     progress.linkedBookIds.push(intent.bookId);
+    progress.sourceLinked = true;
     log('source-linked', { id: progress.sourceId, bookId: intent.bookId });
   }
 
@@ -103,32 +114,63 @@ async function tryUnifiedCapture(job, ctx) {
   const { intent, progress } = job;
   const { api, log = () => {}, onCapabilityMissing } = ctx;
 
-  const payload = {
-    book_id: intent.bookId,
-    mode: intent.mode,
-    url: intent.normalizedUrl || intent.url,
-    title: intent.title,
-    authors: intent.source.authors,
-    container_title: intent.source.container_title,
-    year: intent.source.year || null,
-    doi: intent.source.doi || '',
-    accessed_at: intent.source.accessed_at,
-    kind: intent.kind,
-    body: intent.body,
-    tags: intent.tags,
-  };
+  const { payload } = buildCapturePayload(intent);
+
+  // Dieselben Pruefungen wie auf dem Fallback-Pfad. Ohne sie waere der
+  // Ein-Request-Pfad die Luecke, durch die ein zu langes Zitat ungeprueft
+  // hinausgeht — der Server kuerzt es dann still, und die Erweiterung quittiert
+  // einen Wortlaut, den so niemand gespeichert hat.
+  const problems = [
+    ...(wantsResearch(intent.mode)
+      ? validateResearchPayload(payload, { verbatimBody: isVerbatim(intent) })
+      : []),
+    ...(wantsSource(intent.mode) ? validateSourcePayload(payload) : []),
+  ];
+  if (problems.length) throwValidation(problems);
+
+  // Der JSON-Koerper laeuft in den Body-Parser, nicht in die Route: 256 kB
+  // ueberschritten heisst `413` OHNE `error_code`, als HTML-Seite. Vorher
+  // pruefen, damit die Meldung den Grund nennt.
+  const bytes = jsonByteLength(payload);
+  if (bytes > LIMITS.CAPTURE_JSON_MAX_BYTES) {
+    throw new ApiError({
+      status: 413,
+      code: 'CLIENT_PAYLOAD_TOO_LARGE',
+      params: { max: LIMITS.CAPTURE_JSON_MAX_BYTES, actual: bytes },
+      message: `capture payload ${bytes} bytes`,
+    });
+  }
 
   try {
-    const result = await api.capture(payload);
+    const result = (await api.capture(payload)) || {};
     progress.via = 'capture';
-    if (result && result.research_item) progress.researchItemId = result.research_item.id ?? null;
-    if (result && result.source) {
+
+    // Der Vertrag antwortet mit drei Flags — `research_created`,
+    // `source_created`, `source_linked`. Sie sind die einzige Grundlage fuer
+    // „war schon drin"; ein `created` gibt es nicht.
+    if (result.research_item) {
+      progress.researchItemId = result.research_item.id ?? null;
+      progress.researchCreated = result.research_created !== false;
+    }
+    if (result.source) {
       progress.sourceId = result.source.id ?? null;
+      progress.sourceCreated = result.source_created !== false;
+      // `source_linked` heisst „DIESER Aufruf hat verknuepft" — `false` also
+      // „hing schon am Buch", nicht „haengt nicht dran". Der Aufruf ist
+      // transaktional; in beiden Faellen ist die Quelle danach am Buch, deshalb
+      // wird `linkedBookIds` unabhaengig vom Flag gesetzt und der eigene
+      // `/link`-Request entfaellt.
+      progress.sourceLinked = result.source_linked !== false;
       if (intent.bookId && !progress.linkedBookIds.includes(intent.bookId)) {
         progress.linkedBookIds.push(intent.bookId);
       }
     }
-    log('capture-unified', { created: result && result.created });
+
+    log('capture-unified', {
+      researchCreated: progress.researchCreated,
+      sourceCreated: progress.sourceCreated,
+      sourceLinked: progress.sourceLinked,
+    });
     await uploadAttachments(job, ctx);
     return true;
   } catch (error) {
@@ -144,8 +186,78 @@ async function tryUnifiedCapture(job, ctx) {
 }
 
 /**
+ * Baut den Koerper fuer `POST /capture` — VOLLSTAENDIG.
+ *
+ * Er trug lange nur die Haelfte der Felder: ohne `csl_type` setzt der Server
+ * `website`, und `editors`, `publisher`, `place`, `isbn` und `note` fielen
+ * ersatzlos weg. Ein Buch mit ISBN verlor auf dem besseren Weg also Angaben,
+ * die der Fallback-Pfad vollstaendig uebertrug.
+ *
+ * `source` traegt wie in `POST /research` die Herkunfts-URL als String;
+ * `url` ist die Adresse, aus der der Server die Quelle bildet.
+ *
  * @param {import('../shared/config.js').CaptureIntent} intent
- * @returns {Record<string, any>}
+ * @returns {{ payload: Record<string, any>, truncations: import('../shared/limits.js').Truncation[] }}
+ */
+export function buildCapturePayload(intent) {
+  const draft = intent.source || {};
+  const url = intent.normalizedUrl || intent.url || '';
+
+  return clampCapturePayload(
+    {
+      book_id: intent.bookId,
+      mode: intent.mode,
+      url: draft.url || url,
+      title: intent.title,
+      body: intent.body,
+      kind: intent.kind,
+      tags: Array.isArray(intent.tags) ? intent.tags : [],
+      source: url,
+      authors: Array.isArray(draft.authors) ? draft.authors : [],
+      editors: Array.isArray(draft.editors) ? draft.editors : [],
+      container_title: draft.container_title || '',
+      publisher: draft.publisher || '',
+      place: draft.place || '',
+      year: draft.year || null,
+      doi: draft.doi || '',
+      isbn: draft.isbn || '',
+      csl_type: draft.csl_type || 'website',
+      accessed_at: draft.accessed_at || '',
+      note: draft.note || '',
+    },
+    { verbatimBody: isVerbatim(intent) },
+  );
+}
+
+/**
+ * Traegt dieser Auftrag einen wortwoertlichen Fund?
+ *
+ * Dann darf `body` nicht gekuerzt werden — im Grenzfall wird der Auftrag
+ * sichtbar abgelehnt. Siehe CLAUDE.md, „Wortlauttreue".
+ *
+ * @param {import('../shared/config.js').CaptureIntent} intent
+ */
+function isVerbatim(intent) {
+  return intent.kind === 'quote';
+}
+
+/**
+ * Kann dieser Auftrag ueberhaupt ueber `POST /capture` gehen?
+ *
+ * Der dokumentierte Koerper von `/capture` kennt kein `citekey`. Wer einen
+ * vergeben hat, muss deshalb den Fallback-Pfad nehmen — dort nimmt
+ * `POST /sources` ihn an. Ihn auf dem Ein-Request-Pfad einfach mitzuschicken
+ * waere ein erfundenes Feld; ihn wegzulassen waere stiller Datenverlust.
+ *
+ * @param {import('../shared/config.js').CaptureIntent} intent
+ */
+export function unifiedCaptureFits(intent) {
+  return !hasText(intent.source && intent.source.citekey);
+}
+
+/**
+ * @param {import('../shared/config.js').CaptureIntent} intent
+ * @returns {{ payload: Record<string, any>, truncations: import('../shared/limits.js').Truncation[] }}
  */
 export function buildResearchPayload(intent) {
   /** @type {Array<{url: string, label: string}>} */
@@ -156,24 +268,27 @@ export function buildResearchPayload(intent) {
     const key = entry.url.trim();
     if (seen.has(key)) continue;
     seen.add(key);
-    urls.push({ url: key, label: (entry.label || '').slice(0, 300) });
+    urls.push({ url: key, label: entry.label || '' });
   }
 
-  return {
-    book_id: intent.bookId,
-    kind: intent.kind,
-    title: intent.title,
-    body: intent.body,
-    // Laut Absprache: `source` traegt die Herkunfts-URL als String.
-    source: intent.normalizedUrl || intent.url || '',
-    urls,
-    tags: Array.isArray(intent.tags) ? intent.tags : [],
-  };
+  return clampResearchPayload(
+    {
+      book_id: intent.bookId,
+      kind: intent.kind,
+      title: intent.title,
+      body: intent.body,
+      // Laut Absprache: `source` traegt die Herkunfts-URL als String.
+      source: intent.normalizedUrl || intent.url || '',
+      urls,
+      tags: Array.isArray(intent.tags) ? intent.tags : [],
+    },
+    { verbatimBody: isVerbatim(intent) },
+  );
 }
 
 /**
  * @param {import('../shared/config.js').CaptureIntent} intent
- * @returns {Record<string, any>}
+ * @returns {{ payload: Record<string, any>, truncations: import('../shared/limits.js').Truncation[] }}
  */
 export function buildSourcePayload(intent) {
   const draft = intent.source || {};
@@ -194,7 +309,7 @@ export function buildSourcePayload(intent) {
     note: draft.note || '',
   };
   if (hasText(draft.citekey)) payload.citekey = draft.citekey.trim();
-  return payload;
+  return clampSourcePayload(payload);
 }
 
 /**
@@ -213,9 +328,12 @@ async function createOrReuseSource(job, ctx) {
       const found = await api.findSourceByUrl(intent.normalizedUrl || intent.url, intent.bookId);
       if (found && found.source && found.source.id) {
         progress.sourceId = found.source.id;
+        // Wiederverwendet, nicht angelegt — genau das soll der Nutzer erfahren.
+        progress.sourceCreated = false;
         progress.via = progress.via || 'split';
         if (found.linked_to_book && intent.bookId && !progress.linkedBookIds.includes(intent.bookId)) {
           progress.linkedBookIds.push(intent.bookId);
+          progress.sourceLinked = true;
         }
         log('source-reused', { id: progress.sourceId });
         return;
@@ -229,7 +347,7 @@ async function createOrReuseSource(job, ctx) {
     }
   }
 
-  const payload = buildSourcePayload(intent);
+  const { payload } = buildSourcePayload(intent);
   const problems = validateSourcePayload(payload);
   if (problems.length) throwValidation(problems);
 
@@ -249,13 +367,22 @@ async function createOrReuseSource(job, ctx) {
   }
 
   progress.sourceId = source && source.id !== undefined ? source.id : null;
+  progress.sourceCreated = true;
   progress.via = progress.via || 'split';
   log('source-created', { id: progress.sourceId });
 }
 
 /**
- * Screenshot und PDF nachreichen. Fehler hier sind nicht kritisch genug,
- * um den ganzen Auftrag zu wiederholen — der Haupteintrag steht bereits.
+ * Screenshot und PDF nachreichen.
+ *
+ * Die Groesse wird VOR dem Request geprueft. Nicht aus Hoeflichkeit: Body-Parser
+ * und Route haben dieselbe Schwelle, der Parser kommt zuerst, und was er
+ * zurueckgibt, ist ein `413` ohne `error_code` als HTML-Seite. Ohne die Pruefung
+ * hier bekaeme der Nutzer „Der Server hat die Uebertragung abgebrochen" statt
+ * „das PDF ist zu gross".
+ *
+ * Beide Endpunkte heissen `doc` — auch der der Quelle. `/sources/:id/pdf` gibt
+ * es nicht.
  *
  * @param {import('../shared/config.js').CaptureJob} job
  * @param {RunContext} ctx
@@ -267,23 +394,50 @@ async function uploadAttachments(job, ctx) {
 
   if (attachments.screenshot && progress.researchItemId && !progress.imageUploaded) {
     const { bytes, contentType } = attachments.screenshot;
-    await api.uploadResearchImage(progress.researchItemId, toBinary(bytes), contentType || 'image/jpeg');
+    const data = toBinary(bytes);
+    throwIfTooLarge(byteLength(data), 'image');
+    await api.uploadResearchImage(progress.researchItemId, data, contentType || 'image/jpeg');
     progress.imageUploaded = true;
     log('image-uploaded', { id: progress.researchItemId });
   }
 
   if (attachments.pdf && !progress.pdfUploaded) {
     const data = toBinary(attachments.pdf.bytes);
+    throwIfTooLarge(byteLength(data), 'doc');
+    const name = attachments.pdf.name || '';
     if (progress.sourceId) {
-      await api.uploadSourcePdf(progress.sourceId, data);
+      await api.uploadSourceDoc(progress.sourceId, data, name);
       progress.pdfUploaded = true;
-      log('pdf-uploaded', { sourceId: progress.sourceId });
+      log('source-doc-uploaded', { sourceId: progress.sourceId });
     } else if (progress.researchItemId) {
-      await api.uploadResearchDoc(progress.researchItemId, data);
+      await api.uploadResearchDoc(progress.researchItemId, data, name);
       progress.pdfUploaded = true;
-      log('doc-uploaded', { researchItemId: progress.researchItemId });
+      log('research-doc-uploaded', { researchItemId: progress.researchItemId });
     }
   }
+}
+
+/**
+ * @param {Uint8Array|ArrayBuffer} data
+ * @returns {number}
+ */
+function byteLength(data) {
+  return data.byteLength;
+}
+
+/**
+ * @param {number} bytes
+ * @param {'image'|'doc'} kind
+ */
+function throwIfTooLarge(bytes, kind) {
+  const problem = validateBinarySize(bytes, kind);
+  if (!problem) return;
+  throw new ApiError({
+    status: 413,
+    code: kind === 'image' ? 'CLIENT_IMAGE_TOO_LARGE' : 'CLIENT_DOC_TOO_LARGE',
+    params: problem.params,
+    message: `${kind} ${bytes} bytes`,
+  });
 }
 
 /**

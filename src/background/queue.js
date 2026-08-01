@@ -74,6 +74,10 @@ export function createQueue({ load, save, now = () => Date.now(), random = Math.
         linkedBookIds: [],
         imageUploaded: false,
         pdfUploaded: false,
+        // Was der Server gemeldet hat — `null` heisst „noch nichts versucht".
+        researchCreated: null,
+        sourceCreated: null,
+        sourceLinked: null,
         via: null,
       },
     };

@@ -65,10 +65,30 @@ const server = await startMockServer({
   token,
   port,
   host,
-  // Beide Endpunkte anbieten, damit der Pruefer den vollen Funktionsumfang
+  // Alle Endpunkte anbieten, damit der Pruefer den vollen Funktionsumfang
   // sieht und nicht die Degradationspfade fuer aeltere Server.
   hasCapture: true,
   hasByUrl: true,
+  hasResearchList: true,
+  // Ein vorhandener Eintrag, damit die Dublettenpruefung im Popup etwas
+  // zu melden hat, sobald dieselbe Seite ein zweites Mal erfasst wird.
+  researchIndex: [
+    {
+      id: 4711,
+      book_id: 1,
+      kind: 'link',
+      title: 'Citation',
+      source: 'https://en.wikipedia.org/wiki/Citation',
+      body: 'Beispieleintrag des Referenz-Servers.',
+      urls: [{ url: 'https://en.wikipedia.org/wiki/Citation', label: '' }],
+      tags: [],
+      links: [],
+      pinned: false,
+      archived: false,
+      created_at: '2026-01-01T00:00:00.000Z',
+      updated_at: '2026-01-01T00:00:00.000Z',
+    },
+  ],
   onRequest: logRequest,
 });
 
@@ -84,8 +104,9 @@ process.stdout.write([
   'Vorlage: store/test-instructions.md',
   '',
   'Angebotene Buecher: Nordlicht (owner) · Mitschrift (editor) ·',
-  'Fremdes Buch (viewer — liefert absichtlich BOOK_ACCESS_DENIED, damit die',
-  'Fehlerbehandlung sichtbar ist).',
+  'Fremdes Buch (viewer — liefert absichtlich 403 INSUFFICIENT_ROLE mit',
+  'detail {actual: viewer, required: editor}, damit die Fehlerbehandlung',
+  'sichtbar ist: die Erweiterung nennt die Ursache, nicht nur „verweigert").',
   '',
   'Jede Anfrage wird unten protokolliert. Daran siehst du auch, ob der Pruefer',
   'die Erweiterung wirklich ausprobiert hat.',

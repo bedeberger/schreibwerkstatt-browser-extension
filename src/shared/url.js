@@ -135,6 +135,95 @@ export function sameResource(a, b) {
   return !!na && na === nb;
 }
 
+// ---------------------------------------------------------------------------
+// Serverseitige Normalisierung, hier nachgebaut
+// ---------------------------------------------------------------------------
+
+/**
+ * Warum es zwei Normalisierer gibt:
+ *
+ * `normalizeUrl` oben ist die Form, die wir SENDEN und lokal vergleichen
+ * (Queue-Dubletten, Doppelklick-Schutz). Sie ist bewusst konservativer als der
+ * Server: sie behaelt `www.`, das Schema und `#!`-Routen.
+ *
+ * `serverNormalizeUrl` ist dagegen ein zeichengenauer Nachbau von
+ * `lib/url-normalize.js` im Mutterprojekt. Er wird nur dort gebraucht, wo der
+ * Client eine Server-Antwort mit einer eigenen URL VERGLEICHT — heute die
+ * Dublettenpruefung gegen `urls[].url` aus `GET /research`. Wuerden wir dafuer
+ * die obere Funktion nehmen, hielte der Client `https://x.de/a/` und
+ * `http://www.x.de/a` fuer verschiedene Seiten, der Server aber fuer dieselbe.
+ *
+ * Aenderungen hier gehoeren mit `lib/url-normalize.js` abgeglichen; ein Test
+ * in `test/url.test.js` haelt die dokumentierten Faelle fest.
+ */
+
+/**
+ * Exakt die Liste aus `lib/url-normalize.js`. `ref` steht bewusst NICHT drin —
+ * manche Seiten liefern darueber tatsaechlich anderen Inhalt aus.
+ */
+const SERVER_TRACKING_PARAMS = new Set([
+  'fbclid', 'gclid', 'dclid', 'msclkid', 'yclid', 'twclid', 'igshid',
+  'mc_cid', 'mc_eid', 'vero_id', 'vero_conv', '_hsenc', '_hsmi', 'hsctatracking',
+  'wt_mc', 'wt_zmc', 'pk_campaign', 'pk_kwd', 'piwik_campaign', 'piwik_kwd',
+  'mkt_tok', 's_kwcid', 'ck_subscriber_id', 'oly_anon_id', 'oly_enc_id',
+]);
+
+function isServerTrackingParam(name) {
+  const lower = String(name).toLowerCase();
+  return lower.startsWith('utm_') || SERVER_TRACKING_PARAMS.has(lower);
+}
+
+/**
+ * Normalisiert wie der Server: Fragment weg, `www.` weg, http -> https,
+ * Standardport weg, Tracking-Parameter weg, Query sortiert, Trailing-Slash
+ * weg (der Root-Slash bleibt).
+ *
+ * @param {unknown} raw
+ * @returns {string|null} null, wenn es keine brauchbare http(s)-URL ist
+ */
+export function serverNormalizeUrl(raw) {
+  const value = typeof raw === 'string' ? raw.trim() : '';
+  if (!value) return null;
+
+  let url;
+  try {
+    url = new URL(value);
+  } catch {
+    return null;
+  }
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
+
+  url.hash = '';
+  url.hostname = url.hostname.toLowerCase().replace(/^www\./, '');
+  if ((url.protocol === 'http:' && url.port === '80') || (url.protocol === 'https:' && url.port === '443')) {
+    url.port = '';
+  }
+  // Reihenfolge zaehlt: erst den Standardport des ALTEN Schemas entfernen,
+  // dann vereinheitlichen — sonst ueberlebt ein `:80` den Wechsel auf https.
+  url.protocol = 'https:';
+
+  for (const name of [...url.searchParams.keys()]) {
+    if (isServerTrackingParam(name)) url.searchParams.delete(name);
+  }
+  url.searchParams.sort();
+
+  let out = url.toString();
+  out = out.replace(/\?$/, '');
+  out = out.replace(/^(https:\/\/[^/]+\/[^?#]*?)\/(?=$|\?)/, '$1');
+  return out;
+}
+
+/**
+ * Bezeichnen zwei URLs nach SERVER-Regeln dasselbe Dokument?
+ * @param {unknown} a
+ * @param {unknown} b
+ */
+export function sameServerResource(a, b) {
+  const na = serverNormalizeUrl(a);
+  const nb = serverNormalizeUrl(b);
+  return !!na && !!nb && na === nb;
+}
+
 /**
  * Bringt die vom Nutzer eingetippte Server-Adresse in Form.
  * Ein Unterpfad bleibt erhalten (self-hosted hinter Reverse-Proxy),
@@ -236,4 +325,33 @@ export function sameOrigin(a, b) {
   const ua = parse(a);
   const ub = parse(b);
   return !!ua && !!ub && ua.origin === ub.origin;
+}
+
+/**
+ * Dateiname aus einer URL — fuer den `?name=`-Parameter der Anhang-Endpunkte.
+ *
+ * Query und Fragment fallen weg, Prozentkodierung wird aufgeloest. Liefert eine
+ * URL keinen brauchbaren letzten Pfadteil (`/artikel/`, nur Host), kommt der
+ * Rueckfall `dokument.pdf` — der Server kuerzt den Namen ohnehin auf 200
+ * Zeichen, und die Erweiterung schickt lieber etwas Lesbares als nichts.
+ *
+ * @param {unknown} raw
+ * @returns {string}
+ */
+export function fileNameFromUrl(raw) {
+  const url = parse(raw);
+  const last = url ? url.pathname.split('/').filter(Boolean).pop() || '' : '';
+
+  let name = last;
+  try {
+    name = decodeURIComponent(last);
+  } catch {
+    // Kaputte Prozentkodierung: den rohen Teil nehmen, nicht scheitern.
+  }
+  // Ein Dateiname mit Pfadtrennern oder Steuerzeichen hat in einem
+  // Query-Parameter nichts zu suchen.
+  name = name.replace(/[\\/\u0000-\u001f\u007f]/g, '').trim();
+
+  if (!name) return 'dokument.pdf';
+  return /\.pdf$/i.test(name) ? name : `${name}.pdf`;
 }

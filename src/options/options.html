@@ -190,8 +190,20 @@
                 </select>
               </td>
             </tr>
+            <tr>
+              <td><code class="code">GET /research</code></td>
+              <td id="cap-research-detected">–</td>
+              <td>
+                <select id="cap-research-mode" class="input input--narrow">
+                  <option value="auto" data-i18n="options_cap_auto">automatisch</option>
+                  <option value="on" data-i18n="options_cap_on">erzwingen</option>
+                  <option value="off" data-i18n="options_cap_off">nicht benutzen</option>
+                </select>
+              </td>
+            </tr>
           </tbody>
         </table>
+        <p class="field__hint" id="cap-research-scope" hidden></p>
         <p class="field__hint" id="cap-probed-at"></p>
       </section>
 

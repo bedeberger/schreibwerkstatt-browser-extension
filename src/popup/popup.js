@@ -7,9 +7,18 @@
  */
 
 import { canWriteToBook, TOKEN_STATE } from '../shared/config.js';
+import { describeError } from '../shared/errors.js';
 import { applyI18n, t } from '../shared/i18n.js';
 import { intentFromHarvest, mergeLookup } from '../shared/intent.js';
-import { CSL_TYPES, LIMITS, validateResearchPayload, validateSourcePayload } from '../shared/limits.js';
+import {
+  CSL_TYPES,
+  LIMITS,
+  RESEARCH_LIST,
+  clampResearchPayload,
+  clampSourcePayload,
+  validateResearchPayload,
+  validateSourcePayload,
+} from '../shared/limits.js';
 import { MSG, send } from '../shared/messages.js';
 import { formatPeople, parsePeople } from '../shared/people.js';
 import { hostLabel, normalizeUrl } from '../shared/url.js';
@@ -33,8 +42,10 @@ const ui = {
   body: el('body'),
   bodyCounter: el('body-counter'),
   truncationHint: el('truncation-hint'),
+  clampHint: el('clamp-hint'),
   verbatimHint: el('verbatim-hint'),
   duplicateNotice: el('duplicate-notice'),
+  duplicateIncomplete: el('duplicate-incomplete'),
   provenanceNotice: el('provenance-notice'),
 
   sourceFields: el('source-fields'),
@@ -92,10 +103,12 @@ async function init() {
     return;
   }
 
+  // Text und Code kommen aus derselben Map wie jede andere Fehlermeldung —
+  // hier stand sonst ein Code, den der Server nie geschickt hat.
   if (context.state.tokenState === TOKEN_STATE.INVALID) {
-    showTokenProblem(`${t('err_not_logged_in')} (NOT_LOGGED_IN)`);
+    showTokenProblem(describeError({ status: 401, code: 'NOT_LOGGED_IN' }, t).text);
   } else if (context.state.tokenState === TOKEN_STATE.SCOPE_MISSING) {
-    showTokenProblem(`${t('err_capture_scope_required')} (CAPTURE_SCOPE_REQUIRED)`);
+    showTokenProblem(describeError({ status: 403, code: 'DEVICE_SCOPE_FORBIDDEN' }, t).text);
   }
 
   fillBooks(context.state.books, context.state.defaultBookId);
@@ -267,12 +280,17 @@ function showProvenance(provenance, bylineHint) {
 function wireEvents() {
   ui.title.addEventListener('input', updateCounters);
   ui.body.addEventListener('input', updateCounters);
+  // Auch diese Felder haben serverseitige Grenzen — der Hinweis muss mitgehen.
+  ui.tags.addEventListener('input', updateClampHint);
+  ui.sourceUrl.addEventListener('input', updateClampHint);
+  ui.kind.addEventListener('change', updateClampHint);
   ui.authors.addEventListener('input', updateAuthorsPreview);
   ui.book.addEventListener('change', () => void checkDuplicate());
 
   for (const radio of document.querySelectorAll('input[name="mode"]')) {
     radio.addEventListener('change', () => {
       updateModeVisibility();
+      updateClampHint();
       void checkDuplicate();
     });
   }
@@ -306,6 +324,83 @@ function currentMode() {
 function updateCounters() {
   setCounter(ui.titleCounter, ui.title.value.length, LIMITS.TITLE_MAX);
   setCounter(ui.bodyCounter, ui.body.value.length, LIMITS.BODY_MAX);
+  updateClampHint();
+}
+
+/** Feldname -> anzeigbare Bezeichnung. Literale, damit der i18n-Test sie sieht. */
+const CLAMP_LABELS = {
+  title: 'popup_clamp_title',
+  body: 'popup_clamp_body',
+  source: 'popup_clamp_source',
+  tags: 'popup_clamp_tags',
+  urls: 'popup_clamp_urls',
+  url: 'popup_clamp_url',
+};
+
+/**
+ * Sagt vorher, was der Server beim Speichern still abschneiden wuerde.
+ *
+ * Der Punkt ist nicht die Laenge, sondern die Quittung: der Server lehnt zu
+ * lange Textfelder nicht ab, er kuerzt sie und antwortet 2xx. Wer das nicht
+ * anzeigt, meldet „gespeichert" ueber einen Text, den so niemand gespeichert
+ * hat. Gerechnet wird mit denselben Funktionen, die spaeter wirklich kuerzen.
+ */
+function clampPreview() {
+  const mode = currentMode();
+  const verbatimBody = ui.kind.value === 'quote';
+  /** @type {import('../shared/limits.js').Truncation[]} */
+  const truncations = [];
+
+  if (mode !== 'source') {
+    truncations.push(
+      ...clampResearchPayload(
+        {
+          title: ui.title.value,
+          body: ui.body.value,
+          source: normalizeUrl(ui.sourceUrl.value) || '',
+          tags: readTags(),
+          urls: context.intent ? context.intent.urls : [],
+        },
+        { verbatimBody },
+      ).truncations,
+    );
+  }
+
+  if (mode !== 'research') {
+    const seen = new Set(truncations.map((entry) => `${entry.field}:${entry.max}`));
+    truncations.push(
+      ...clampSourcePayload({ title: ui.title.value, url: ui.sourceUrl.value }).truncations.filter(
+        (entry) => !seen.has(`${entry.field}:${entry.max}`),
+      ),
+    );
+  }
+
+  return truncations;
+}
+
+function updateClampHint() {
+  const truncations = clampPreview();
+  if (!truncations.length) {
+    ui.clampHint.hidden = true;
+    return;
+  }
+  const parts = truncations.map((entry) =>
+    t('popup_clamp_field', [
+      t(CLAMP_LABELS[entry.field] || 'popup_clamp_body'),
+      String(entry.max),
+      String(entry.actual),
+    ]),
+  );
+  ui.clampHint.textContent = t('popup_clamp_hint', [parts.join(' · ')]);
+  ui.clampHint.hidden = false;
+}
+
+/** @returns {string[]} */
+function readTags() {
+  return ui.tags.value
+    .split(',')
+    .map((tag) => tag.trim())
+    .filter(Boolean);
 }
 
 /**
@@ -338,24 +433,66 @@ function updateAuthorsPreview() {
 // Dubletten und Lookup
 // ---------------------------------------------------------------------------
 
+/**
+ * Zwei Fragen, zwei Endpunkte:
+ *
+ *   „Quelle schon in der Bibliothek?"  -> `GET /sources/by-url`
+ *   „Seite in diesem Buch erfasst?"    -> `GET /research`
+ *
+ * Die zweite gilt in JEDEM Modus — auch bei reiner Recherche, denn dort
+ * entsteht der Eintrag, um den es geht. Die erste nur, wenn wirklich eine
+ * Quelle angelegt wird.
+ */
 async function checkDuplicate() {
   ui.duplicateNotice.hidden = true;
+  ui.duplicateIncomplete.hidden = true;
   if (!context.harvested) return;
   if (!context.state.settings.duplicateCheck) return;
-  if (currentMode() === 'research') return;
 
   const url = normalizeUrl(ui.sourceUrl.value || context.harvested.meta.normalizedUrl);
   if (!url) return;
 
   try {
     const result = await send(MSG.CHECK_DUPLICATE, { url, bookId: ui.book.value || null });
-    if (!result.supported || !result.found) return;
-    ui.duplicateNotice.textContent = result.linkedToBook
-      ? t('popup_duplicate_in_book')
-      : t('popup_duplicate_in_library');
-    ui.duplicateNotice.hidden = false;
+    renderDuplicate(result.source || {}, result.research || {});
   } catch {
     // Dubletten-Pruefung ist Komfort; ein Fehler blockiert das Erfassen nicht.
+  }
+}
+
+/**
+ * @param {Record<string, any>} source Befund aus `GET /sources/by-url`
+ * @param {Record<string, any>} research Befund aus `GET /research`
+ */
+function renderDuplicate(source, research) {
+  /** @type {string[]} */
+  const found = [];
+
+  if (currentMode() !== 'research' && source.supported && source.found) {
+    found.push(source.linkedToBook ? t('popup_duplicate_in_book') : t('popup_duplicate_in_library'));
+  }
+  if (research.supported && research.found) {
+    found.push(t('popup_duplicate_research', [String(research.matches.length)]));
+  }
+
+  if (found.length) {
+    ui.duplicateNotice.textContent = found.join(' ');
+    ui.duplicateNotice.hidden = false;
+  }
+
+  // Kein Treffer ist nur dann Entwarnung, wenn wirklich alles geprueft wurde.
+  // Sonst steht hier, WARUM die Aussage nicht traegt — nie ein stilles Nichts.
+  if (research.scopeMissing) {
+    ui.duplicateIncomplete.textContent = t('popup_duplicate_scope_missing');
+    ui.duplicateIncomplete.hidden = false;
+    return;
+  }
+  if (research.supported && !research.complete) {
+    ui.duplicateIncomplete.textContent =
+      research.truncatedBy === 'fts'
+        ? t('popup_duplicate_incomplete_fts', [String(RESEARCH_LIST.FTS_PREFILTER_CAP)])
+        : t('popup_duplicate_incomplete_limit', [String(research.scanned)]);
+    ui.duplicateIncomplete.hidden = false;
   }
 }
 
@@ -435,10 +572,7 @@ function readIntent() {
     title: ui.title.value.trim(),
     // Wortlaut so lassen, wie er im Feld steht — kein Trim innerhalb des Zitats.
     body: ui.body.value,
-    tags: ui.tags.value
-      .split(',')
-      .map((tag) => tag.trim())
-      .filter(Boolean),
+    tags: readTags(),
     urls: context.intent ? context.intent.urls : [],
     source: readSourceDraft(),
     attachments: {},
@@ -456,18 +590,24 @@ async function submit() {
   }
 
   // Clientseitig gegen die Serverlimits pruefen, damit kein 400 zurueckkommt.
+  // Was der Server still kuerzt, steht hier NICHT — das meldet `clampHint`
+  // vorab und `clamp*Payload` fuehrt es beim Senden aus.
   /** @type {import('../shared/limits.js').ValidationProblem[]} */
   const problems = [];
   if (intent.mode !== 'source') {
     problems.push(
-      ...validateResearchPayload({
-        book_id: intent.bookId,
-        kind: intent.kind,
-        title: intent.title,
-        body: intent.body,
-        source: intent.normalizedUrl,
-        urls: intent.urls,
-      }),
+      ...validateResearchPayload(
+        {
+          book_id: intent.bookId,
+          kind: intent.kind,
+          title: intent.title,
+          body: intent.body,
+          source: intent.normalizedUrl,
+          urls: intent.urls,
+        },
+        // Ein markiertes Zitat wird abgelehnt, nicht beschnitten.
+        { verbatimBody: intent.kind === 'quote' },
+      ),
     );
   }
   if (intent.mode !== 'research') {
@@ -503,8 +643,8 @@ async function submit() {
     }
 
     if (result.done) {
-      showMessage(ui.formSuccess, t('popup_saved', [intent.bookName]));
-      setTimeout(() => window.close(), 900);
+      showMessage(ui.formSuccess, successText(intent, result.outcome));
+      setTimeout(() => window.close(), 1400);
       return;
     }
 
@@ -519,6 +659,27 @@ async function submit() {
     ui.submit.disabled = false;
     ui.submit.textContent = t('popup_submit');
   }
+}
+
+/**
+ * „Gespeichert" ist nicht die ganze Auskunft.
+ *
+ * Der Server sagt mit `research_created` / `source_created` / `source_linked`,
+ * ob wirklich etwas Neues entstanden ist oder ob er eine vorhandene Quelle
+ * wiederverwendet bzw. einen Doppelklick erkannt hat. Ohne diese Flags waere
+ * „war schon drin" nicht von „neu angelegt" zu unterscheiden — und genau das
+ * ist die Frage, die sich beim zweiten Erfassen derselben Seite stellt.
+ *
+ * @param {Record<string, any>} intent
+ * @param {Record<string, any>|null} [outcome] `progress` des Auftrags
+ */
+function successText(intent, outcome) {
+  const parts = [t('popup_saved', [intent.bookName])];
+  if (outcome) {
+    if (outcome.sourceCreated === false) parts.push(t('popup_saved_source_existed'));
+    if (outcome.researchCreated === false) parts.push(t('popup_saved_research_existed'));
+  }
+  return parts.join(' ');
 }
 
 async function refreshCounts() {

@@ -1,7 +1,8 @@
 /**
  * Erkennung der noch nicht ueberall deployten Endpunkte.
  *
- * `POST /capture` und `GET /sources/by-url` gibt es nicht auf jedem Server.
+ * `POST /capture`, `GET /sources/by-url` und `GET /research` gibt es nicht auf
+ * jedem Server.
  * Unterscheidungsmerkmal: laut Vertrag antwortet die App bei jedem Fehler
  * mit JSON `{ error_code }`. Eine unbekannte Route beantwortet Express
  * dagegen mit einer HTML-Standardseite. Also:
@@ -76,12 +77,52 @@ export async function probeCapture(api) {
 }
 
 /**
+ * Probe fuer `GET /research` — ohne `book_id`, der Endpunkt muss deshalb mit
+ * `400 INVALID_ID` ablehnen. Nichts wird gelesen, nichts geschrieben.
+ *
+ * Sonderfall gegenueber den anderen Proben: `403 DEVICE_SCOPE_FORBIDDEN` wird
+ * hier nicht als „keine Aussage" verworfen, sondern als „Endpunkt da, Scope
+ * fehlt" gewertet. Begruendung: das Scope-Gate sitzt vor dem Routing, ein 403
+ * beweist also streng genommen nicht, dass es die Route gibt. Der wahrschein-
+ * lichere Fall ist aber der neue Server mit einem Token ohne `content:read` —
+ * und wenn die Annahme falsch war, faellt das beim ersten echten Aufruf auf:
+ * der antwortet mit dem HTML-404 von Express, und der Aufrufer setzt die
+ * Faehigkeit auf `false` zurueck. Die Verwechslung kostet einen Request, kein
+ * falsches Ergebnis.
+ *
  * @param {ReturnType<import('./api-client.js').createApiClient>} api
- * @returns {Promise<{capture: boolean|null, byUrl: boolean|null}>}
+ * @returns {Promise<{detected: boolean|null, scopeMissing: boolean}>}
+ */
+export async function probeResearchList(api) {
+  try {
+    await api.listResearch({});
+    // Ohne `book_id` duerfte kein 200 kommen — der Endpunkt ist aber da.
+    return { detected: true, scopeMissing: false };
+  } catch (error) {
+    const err = /** @type {any} */ (error);
+    if (err && err.status === 403 && err.code === 'DEVICE_SCOPE_FORBIDDEN') {
+      return { detected: true, scopeMissing: true };
+    }
+    return { detected: verdictFromError(error), scopeMissing: false };
+  }
+}
+
+/**
+ * @param {ReturnType<import('./api-client.js').createApiClient>} api
+ * @returns {Promise<{capture: boolean|null, byUrl: boolean|null, researchList: boolean|null, researchScopeMissing: boolean}>}
  */
 export async function probeCapabilities(api) {
-  const [capture, byUrl] = await Promise.all([probeCapture(api), probeByUrl(api)]);
-  return { capture, byUrl };
+  const [capture, byUrl, research] = await Promise.all([
+    probeCapture(api),
+    probeByUrl(api),
+    probeResearchList(api),
+  ]);
+  return {
+    capture,
+    byUrl,
+    researchList: research.detected,
+    researchScopeMissing: research.scopeMissing,
+  };
 }
 
 export const __testing = { verdictFromError, PROBE_URL };

@@ -9,7 +9,8 @@
  * einen Mock-Server laeuft, ohne dass `chrome` existieren muss.
  */
 
-import { ApiError } from '../shared/errors.js';
+import { ApiError, isScopeError } from '../shared/errors.js';
+import { clampAttachmentName, clampResearchLimit } from '../shared/limits.js';
 
 /** Zeitlimit je Anfrage. Uploads bekommen mehr. */
 const DEFAULT_TIMEOUT_MS = 20000;
@@ -34,7 +35,8 @@ const UPLOAD_TIMEOUT_MS = 120000;
  * @param {typeof fetch} [deps.fetchImpl]
  * @param {() => Promise<ClientInfo>|ClientInfo} deps.getClientInfo
  * @param {(error: ApiError) => void} [deps.onAuthError] wird bei 401 gerufen
- * @param {(error: ApiError) => void} [deps.onScopeError] wird bei CAPTURE_SCOPE_REQUIRED gerufen
+ * @param {(error: ApiError) => void} [deps.onScopeError] wird bei
+ *   `403 DEVICE_SCOPE_FORBIDDEN` gerufen
  */
 export function createApiClient({ getConfig, fetchImpl, getClientInfo, onAuthError, onScopeError }) {
   const doFetch = fetchImpl || globalThis.fetch.bind(globalThis);
@@ -48,6 +50,11 @@ export function createApiClient({ getConfig, fetchImpl, getClientInfo, onAuthErr
    * @param {string} [options.contentType] noetig bei Rohbody
    * @param {Record<string, any>} [options.query]
    * @param {number} [options.timeoutMs]
+   * @param {boolean} [options.notifyScopeError] `false` haelt `onScopeError`
+   *   zurueck. Noetig fuer Pfade, die einen ANDEREN Scope brauchen als das
+   *   Erfassen: dass `content:read` fehlt, heisst nicht, dass das Token zum
+   *   Schreiben untauglich ist — der globale Token-Zustand darf davon nicht
+   *   auf „Scope fehlt" springen.
    * @returns {Promise<any>}
    */
   async function request(path, options = {}) {
@@ -115,6 +122,12 @@ export function createApiClient({ getConfig, fetchImpl, getClientInfo, onAuthErr
       clearTimeout(timer);
     }
 
+    // NIE `response.json()`: zwei echte Fehlerantworten sind HTML, nicht JSON.
+    // Der Server hat keinen globalen Express-Fehler-Handler, also antwortet der
+    // Body-Parser mit Express' Default — `413` bei zu grossem Koerper, `400` bei
+    // kaputtem JSON, beides als HTML-Seite ohne `error_code`. Ein Parserfehler
+    // hier wuerde den Auftrag aus einem Grund scheitern lassen, der nichts mit
+    // dem Auftrag zu tun hat.
     const text = await response.text().catch(() => '');
     /** @type {any} */
     let parsed = null;
@@ -122,26 +135,38 @@ export function createApiClient({ getConfig, fetchImpl, getClientInfo, onAuthErr
     if (text) {
       try {
         parsed = JSON.parse(text);
-        jsonBody = true;
+        // `null`, `12` und `"text"` sind gueltiges JSON, aber keine Antwort im
+        // Sinne des Vertrags — sonst wuerde `parsed.error_code` unten werfen.
+        jsonBody = parsed !== null && typeof parsed === 'object';
       } catch {
         jsonBody = false;
       }
     }
 
     if (!response.ok) {
+      // Der Server benennt die Zusatzangaben je nach Route `params` oder
+      // `detail` (so bei `INSUFFICIENT_ROLE`: `{ actual, required }`).
+      // Beides landet hier im selben Feld, `params` gewinnt bei Namensgleichheit.
+      const detail = jsonBody && parsed.detail && typeof parsed.detail === 'object' ? parsed.detail : null;
       const error = new ApiError({
         status: response.status,
-        code: (jsonBody && parsed && typeof parsed.error_code === 'string' ? parsed.error_code : '') || '',
-        params: (jsonBody && parsed && parsed.params) || {},
-        message: text.slice(0, 500) || `HTTP ${response.status}`,
+        code: (jsonBody && typeof parsed.error_code === 'string' ? parsed.error_code : '') || '',
+        params: { ...(detail || {}), ...((jsonBody && parsed.params) || {}) },
+        // Ohne `error_code` traegt der Koerper HTML. Der gehoert nicht in eine
+        // Meldung — `describeError` waehlt dann ueber den HTTP-Status.
+        message: (jsonBody ? text.slice(0, 500) : '') || `HTTP ${response.status}`,
       });
       // Fuer die Faehigkeits-Erkennung: ein Express-404 fuer eine unbekannte
       // Route ist HTML, ein fachliches 404 ist JSON mit `error_code`.
       error.jsonBody = jsonBody;
       error.bodyText = text.slice(0, 500);
+      // Welcher Scope fehlt, sagt der Fehlercode nicht — der Pfad schon.
+      error.path = url.pathname;
 
       if (error.status === 401 && onAuthError) onAuthError(error);
-      if (error.code === 'CAPTURE_SCOPE_REQUIRED' && onScopeError) onScopeError(error);
+      if (options.notifyScopeError !== false && isScopeError(error) && onScopeError) {
+        onScopeError(error);
+      }
 
       throw error;
     }
@@ -167,6 +192,49 @@ export function createApiClient({ getConfig, fetchImpl, getClientInfo, onAuthErr
     },
 
     /**
+     * Recherche-Eintraege eines Buchs lesen.
+     *
+     * Reiner Lesepfad, ohne Nebenwirkung. Braucht `content:read` — bereits
+     * ausgestellte `capture`-Token tragen den Scope; ein Server, der ihn nicht
+     * sieht, antwortet `403 DEVICE_SCOPE_FORBIDDEN`. Das ist ein Befund ueber
+     * das Token, keine Stoerung, und markiert deshalb NICHT den globalen
+     * Token-Zustand (`notifyScopeError: false`).
+     *
+     * `limit` geht nie ueber 200 hinaus; der Server wuerde mehr ohnehin
+     * kappen, aber dann wuesste der Aufrufer nicht, wonach er gefragt hat.
+     * Zu `q` gehoert der 500er-Vorfilter — siehe `RESEARCH_LIST` in
+     * `shared/limits.js`.
+     *
+     * @param {object} params
+     * @param {number|string} params.bookId PFLICHT
+     * @param {string} [params.q] FTS5-Syntax
+     * @param {string} [params.kind]
+     * @param {string} [params.tag]
+     * @param {string} [params.linked] "<kind>:<id>"
+     * @param {string} [params.sort]
+     * @param {boolean} [params.archived] auch archivierte mitliefern
+     * @param {number} [params.limit]
+     * @returns {Promise<Array<Record<string, any>>>}
+     */
+    async listResearch(params = /** @type {any} */ ({})) {
+      const limit = clampResearchLimit(params.limit);
+      const data = await request('/research', {
+        notifyScopeError: false,
+        query: {
+          book_id: params.bookId,
+          q: params.q,
+          kind: params.kind,
+          tag: params.tag,
+          linked: params.linked,
+          sort: params.sort,
+          archived: params.archived ? '1' : undefined,
+          limit: limit === null ? undefined : limit,
+        },
+      });
+      return Array.isArray(data) ? data : [];
+    },
+
+    /**
      * @param {number|string} id
      * @param {Blob|ArrayBuffer|Uint8Array} data
      * @param {string} contentType z. B. "image/jpeg"
@@ -180,14 +248,19 @@ export function createApiClient({ getConfig, fetchImpl, getClientInfo, onAuthErr
     },
 
     /**
+     * PDF an ein Fundstueck. Rohe Bytes, `Content-Type: application/pdf`,
+     * Dateiname als `?name=` (serverseitig auf 200 Zeichen gekuerzt).
+     *
      * @param {number|string} id
      * @param {Blob|ArrayBuffer|Uint8Array} data
+     * @param {string} [name] Dateiname; leer laesst den Parameter weg
      */
-    uploadResearchDoc(id, data) {
+    uploadResearchDoc(id, data, name) {
       return request(`/research/${encodeURIComponent(String(id))}/doc`, {
         method: 'POST',
         body: /** @type {any} */ (data),
         contentType: 'application/pdf',
+        query: { name: clampAttachmentName(name) },
       });
     },
 
@@ -211,14 +284,27 @@ export function createApiClient({ getConfig, fetchImpl, getClientInfo, onAuthErr
     },
 
     /**
+     * PDF an eine Quelle.
+     *
+     * Der Endpunkt heisst `doc`, nicht `pdf` — `routes/sources-doc.js`, unter
+     * `/sources` gemountet. `POST /sources/:id/pdf` gibt es nicht und hat es
+     * nie gegeben; der Name stand nur in der Scope-Allowlist des Servers, und
+     * die ist eine Rechte-Liste, keine Routenliste. Ein Aufruf von `/pdf` lief
+     * ins Express-404 und sah aus wie ein kaputter Server.
+     *
+     * Nur der Besitzer der Quelle darf das (`NOT_SOURCE_OWNER`), unabhaengig
+     * vom Buchrecht.
+     *
      * @param {number|string} id
      * @param {Blob|ArrayBuffer|Uint8Array} data
+     * @param {string} [name] Dateiname fuer `?name=`
      */
-    uploadSourcePdf(id, data) {
-      return request(`/sources/${encodeURIComponent(String(id))}/pdf`, {
+    uploadSourceDoc(id, data, name) {
+      return request(`/sources/${encodeURIComponent(String(id))}/doc`, {
         method: 'POST',
         body: /** @type {any} */ (data),
         contentType: 'application/pdf',
+        query: { name: clampAttachmentName(name) },
       });
     },
 
@@ -242,8 +328,23 @@ export function createApiClient({ getConfig, fetchImpl, getClientInfo, onAuthErr
 
     /**
      * Noch nicht ueberall deployed — transaktional und idempotent.
+     *
+     * Die Antwort sagt mit drei Flags, was wirklich passiert ist. Es gibt kein
+     * `created`; wer darauf schaut, sieht immer `undefined` und weiss danach
+     * nichts. Die Idempotenz ist absichtlich zweigeteilt: eine **Quelle**
+     * existiert pro Dokument nur einmal (bekannte URL wird wiederverwendet und
+     * nur verlinkt), ein **Fundstueck** beliebig oft — dedupliziert wird nur ein
+     * wortgleicher Fund (kind + Titel + Text + URL) aus einem 10-Minuten-Fenster,
+     * also der Doppelklick.
+     *
      * @param {Record<string, any>} payload
-     * @returns {Promise<{created: boolean, research_item?: Record<string, any>, source?: Record<string, any>}>}
+     * @returns {Promise<{
+     *   research_item?: Record<string, any>,
+     *   research_created?: boolean,
+     *   source?: Record<string, any>,
+     *   source_created?: boolean,
+     *   source_linked?: boolean,
+     * }>}
      */
     capture(payload) {
       return request('/capture', { method: 'POST', json: payload });

@@ -91,7 +91,7 @@ export async function getTokenState() {
 }
 
 /**
- * @returns {Promise<{capture: {mode: string, detected: boolean|null}, byUrl: {mode: string, detected: boolean|null}, probedAt: number}>}
+ * @returns {Promise<{capture: {mode: string, detected: boolean|null}, byUrl: {mode: string, detected: boolean|null}, researchList: {mode: string, detected: boolean|null, scopeMissing: boolean}, probedAt: number}>}
  */
 export async function getCapabilities() {
   const state = await readState();
@@ -99,7 +99,7 @@ export async function getCapabilities() {
 }
 
 /**
- * @param {{capture?: boolean|null, byUrl?: boolean|null}} detected
+ * @param {{capture?: boolean|null, byUrl?: boolean|null, researchList?: boolean|null, researchScopeMissing?: boolean}} detected
  */
 export async function saveDetectedCapabilities(detected) {
   const current = await getCapabilities();
@@ -107,6 +107,16 @@ export async function saveDetectedCapabilities(detected) {
     ...current,
     capture: { ...current.capture, detected: pick(detected.capture, current.capture.detected) },
     byUrl: { ...current.byUrl, detected: pick(detected.byUrl, current.byUrl.detected) },
+    researchList: {
+      ...current.researchList,
+      detected: pick(detected.researchList, current.researchList.detected),
+      // Nur mitschreiben, wenn die Probe wirklich etwas ueber den Scope
+      // erfahren hat — sonst bliebe eine alte Warnung ewig stehen.
+      scopeMissing:
+        detected.researchScopeMissing === undefined
+          ? current.researchList.scopeMissing
+          : !!detected.researchScopeMissing,
+    },
     probedAt: Date.now(),
   };
   await writeState({ [STORAGE_KEYS.CAPABILITIES]: next });
@@ -123,7 +133,7 @@ function pick(fresh, previous) {
 }
 
 /**
- * @param {'capture'|'byUrl'} name
+ * @param {'capture'|'byUrl'|'researchList'} name
  * @param {'auto'|'on'|'off'} mode
  */
 export async function setCapabilityMode(name, mode) {

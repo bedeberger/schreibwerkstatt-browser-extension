@@ -8,7 +8,7 @@
 import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
 
-import { createApiClient, describeDevice } from '../src/background/api-client.js';
+import { clientVersion, createApiClient, describeDevice } from '../src/background/api-client.js';
 import { probeCapabilities, probeResearchList } from '../src/background/capabilities.js';
 import { buildSourcePayload, runCaptureJob, toBase64, toBinary } from '../src/background/capture-runner.js';
 import { createQueue } from '../src/background/queue.js';
@@ -110,7 +110,15 @@ describe('API-Client', () => {
     assert.equal(call.headers.authorization, 'Bearer swd_gueltig');
     assert.equal(call.headers['x-client-platform'], 'chrome');
     assert.equal(call.headers['x-client-device'], 'Chrome 131 / Linux');
-    assert.equal(call.headers['x-client-version'], '0.1.0');
+    // Mit Praefix, obwohl `CLIENT_INFO.version` nackt ist: der Server liest die
+    // Plattform eines Geraete-Tokens NUR aus dieser Zeichenkette
+    // (`/chrome/i` auf `client_version`), weil `device_tokens.platform` bei
+    // Erweiterungs-Tokens NULL bleibt. Eine nackte `0.1.0` waere fuer ihn die
+    // macOS-App — mitsamt falschem „veraltet" im Admin-Tab.
+    assert.equal(CLIENT_INFO.version, '0.1.0');
+    assert.equal(call.headers['x-client-version'], 'chrome/0.1.0');
+    assert.match(call.headers['x-client-version'], /^chrome\//);
+    assert.equal(clientVersion('chrome', '1.1.1'), 'chrome/1.1.1');
   });
 
   it('liefert die Buecher inklusive Rollen', async () => {

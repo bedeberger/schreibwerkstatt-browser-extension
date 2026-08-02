@@ -45,7 +45,7 @@ Only what belongs to a single capture that you triggered:
 | Screenshot of the visible tab area | only if you tick the box |
 | The page's PDF | only if you tick the box and the page declares a `citation_pdf_url` on the same host |
 | Your device token in the `Authorization` header | every request — it authenticates you to your own server |
-| `X-Client-Platform` (`chrome`), `X-Client-Device` (browser name, version, operating system, e.g. `Google Chrome 131 / Linux`), `X-Client-Version` (extension version) | every request, so your server can tell where an entry came from |
+| `X-Client-Platform` (`chrome`), `X-Client-Device` (browser name, version, operating system, e.g. `Google Chrome 131 / Linux`), `X-Client-Version` (platform and extension version, e.g. `chrome/1.1.1`) | every request, so your server can tell where an entry came from |
 
 **Recipients:** the host you entered, and nobody else. No other endpoint exists.
 

@@ -215,7 +215,8 @@ Ausschließlich das, was du für einen einzelnen Erfassungsvorgang ausgelöst ha
   das Häkchen setzt
 - die Kopfzeilen `X-Client-Platform` (`chrome`), `X-Client-Device`
   (Browsername, -version und Betriebssystem, z. B. `Google Chrome 131 / Linux`)
-  und `X-Client-Version` (Version dieser Erweiterung)
+  und `X-Client-Version` (Plattform und Version dieser Erweiterung, z. B.
+  `chrome/1.1.1`)
 
 ### Wohin
 

@@ -51,7 +51,7 @@ Erfassungsvorgang gehört:
 | Screenshot des sichtbaren Tab-Bereichs | nur wenn du das Häkchen setzt |
 | PDF der Seite | nur wenn du das Häkchen setzt und die Seite ein `citation_pdf_url` auf demselben Host angibt |
 | Dein Gerätetoken im `Authorization`-Header | bei jeder Anfrage — er authentifiziert dich gegenüber deinem eigenen Server |
-| `X-Client-Platform` (`chrome`), `X-Client-Device` (Browsername, -version, Betriebssystem, z. B. `Google Chrome 131 / Linux`), `X-Client-Version` (Version der Erweiterung) | bei jeder Anfrage — damit dein Server erkennt, woher ein Eintrag kam |
+| `X-Client-Platform` (`chrome`), `X-Client-Device` (Browsername, -version, Betriebssystem, z. B. `Google Chrome 131 / Linux`), `X-Client-Version` (Plattform und Version der Erweiterung, z. B. `chrome/1.1.1`) | bei jeder Anfrage — damit dein Server erkennt, woher ein Eintrag kam |
 
 **Empfänger:** allein der von dir eingetragene Host. Es existiert keine weitere
 Gegenstelle.

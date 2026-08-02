@@ -26,8 +26,30 @@ const UPLOAD_TIMEOUT_MS = 120000;
  * @typedef {object} ClientInfo
  * @property {string} platform Wert fuer `X-Client-Platform`
  * @property {string} device Wert fuer `X-Client-Device`
- * @property {string} version Wert fuer `X-Client-Version`
+ * @property {string} version NACKTE Erweiterungsversion (`1.1.1`). Das
+ *   Plattform-Praefix setzt `clientVersion()` — siehe dort, warum es keine
+ *   Kosmetik ist.
  */
+
+/**
+ * Wert fuer `X-Client-Version`: `<plattform>/<version>`, z. B. `chrome/1.1.1`.
+ *
+ * Der Server erkennt die Plattform eines Geraete-Tokens ausschliesslich an
+ * diesem Praefix (`_devicesIsChrome` prueft `/chrome/i` auf `client_version`
+ * bzw. `platform`). `device_tokens.platform` ist bei Tokens der Erweiterung
+ * NULL — die Mint-Oberflaeche schickt keine Plattform, und `X-Client-Platform`
+ * wird nicht persistiert. Eine nackte Version wie `1.1.1` landet deshalb im
+ * Versionsstrang der macOS-App und erzeugt dort ein falsches „veraltet".
+ *
+ * Deshalb steht der Zusammenbau hier und nicht beim Aufrufer: wer
+ * `getClientInfo` implementiert, kann das Praefix nicht vergessen.
+ *
+ * @param {string} platform
+ * @param {string} version
+ */
+export function clientVersion(platform, version) {
+  return `${platform}/${version}`;
+}
 
 /**
  * @param {object} deps
@@ -79,7 +101,7 @@ export function createApiClient({ getConfig, fetchImpl, getClientInfo, onAuthErr
       Authorization: `Bearer ${config.token}`,
       'X-Client-Platform': info.platform,
       'X-Client-Device': info.device,
-      'X-Client-Version': info.version,
+      'X-Client-Version': clientVersion(info.platform, info.version),
       Accept: 'application/json',
     };
 

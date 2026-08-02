@@ -54,6 +54,7 @@ const api = createApiClient({
   getClientInfo: async () => ({
     platform: 'chrome',
     device: describeDevice(navigator),
+    // Nackt — `X-Client-Version` baut der API-Client daraus `chrome/…`.
     version: EXTENSION_VERSION,
   }),
   onAuthError: () => {

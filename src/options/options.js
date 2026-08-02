@@ -6,13 +6,13 @@
  * den eingetragenen Host, nie fuer alle Seiten.
  */
 
-import { CAPABILITY_MODE, TOKEN_PREFIX, TOKEN_STATE, canWriteToBook } from '../shared/config.js';
+import { CAPABILITY_MODE, TOKEN_PREFIX, TOKEN_STATE } from '../shared/config.js';
 import { describeError } from '../shared/errors.js';
-import { applyI18n, formatRelativeTime, t } from '../shared/i18n.js';
-import { MSG, send } from '../shared/messages.js';
+import { MSG } from '../shared/messages.js';
+import { createBookOption, el, errorText, hideNotice, showNotice } from '../shared/notice.js';
 import { isLocalHost, normalizeServerUrl, toOriginPattern } from '../shared/url.js';
-
-const el = (id) => /** @type {any} */ (document.getElementById(id));
+import { applyI18n, formatRelativeTime, t } from '../ui/chrome-i18n.js';
+import { send } from '../ui/messaging.js';
 
 const ui = {
   serverUrl: el('server-url'),
@@ -278,12 +278,7 @@ function renderBooks() {
   ui.defaultBook.append(empty);
 
   for (const book of state.books || []) {
-    const writable = canWriteToBook(book);
-
-    const option = document.createElement('option');
-    option.value = String(book.id);
-    option.disabled = !writable;
-    option.textContent = writable ? book.name : `${book.name} — ${t('role_viewer')}`;
+    const option = createBookOption(book, t);
     ui.defaultBook.append(option);
 
     const item = document.createElement('li');
@@ -479,34 +474,12 @@ async function discardJob(jobId, title) {
 
 // ------------------------------------------------------------------- Helfer
 
-/**
- * @param {HTMLElement} node
- * @param {string} text
- * @param {'error'|'success'|'muted'|'warn'} tone
- */
-function showNotice(node, text, tone) {
-  node.textContent = text;
-  node.classList.remove('notice--error', 'notice--success', 'notice--muted', 'notice--warn');
-  node.classList.add(`notice--${tone}`);
-  node.hidden = false;
-}
-
-/** @param {HTMLElement} node */
-function hideNotice(node) {
-  node.hidden = true;
-}
-
 /** @param {HTMLElement} node */
 function flash(node) {
   node.hidden = false;
   setTimeout(() => {
     node.hidden = true;
   }, 1600);
-}
-
-/** @param {any} error */
-function errorText(error) {
-  return (error && error.message) || t('err_unknown');
 }
 
 void init();

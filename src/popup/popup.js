@@ -8,7 +8,6 @@
 
 import { canWriteToBook, TOKEN_STATE } from '../shared/config.js';
 import { describeError } from '../shared/errors.js';
-import { applyI18n, t } from '../shared/i18n.js';
 import { intentFromHarvest, mergeLookup } from '../shared/intent.js';
 import {
   CSL_TYPES,
@@ -19,11 +18,12 @@ import {
   validateResearchPayload,
   validateSourcePayload,
 } from '../shared/limits.js';
-import { MSG, send } from '../shared/messages.js';
+import { MSG } from '../shared/messages.js';
+import { createBookOption, el, errorText, showNotice, showUiError } from '../shared/notice.js';
 import { formatPeople, parsePeople } from '../shared/people.js';
 import { hostLabel, normalizeUrl } from '../shared/url.js';
-
-const el = (id) => /** @type {any} */ (document.getElementById(id));
+import { applyI18n, t } from '../ui/chrome-i18n.js';
+import { send } from '../ui/messaging.js';
 
 const ui = {
   loading: el('loading'),
@@ -160,13 +160,8 @@ function fillBooks(books, defaultBookId) {
 
   let hasViewerOnly = false;
   for (const book of books) {
-    const option = document.createElement('option');
-    option.value = String(book.id);
-    const writable = canWriteToBook(book);
-    if (!writable) hasViewerOnly = true;
-    // Bücher mit `viewer` ausgrauen, nicht verstecken.
-    option.disabled = !writable;
-    option.textContent = writable ? book.name : `${book.name} — ${t('role_viewer')}`;
+    const option = createBookOption(book, t);
+    if (option.disabled) hasViewerOnly = true;
     ui.book.append(option);
   }
 
@@ -585,7 +580,7 @@ async function submit() {
   const intent = readIntent();
 
   if (!intent.bookId) {
-    showMessage(ui.formError, t('validation_book_required'));
+    showNotice(ui.formError, t('validation_book_required'), 'error');
     return;
   }
 
@@ -616,7 +611,7 @@ async function submit() {
 
   if (problems.length) {
     const first = problems[0];
-    showMessage(ui.formError, t(first.key, Object.values(first.params || {}).map(String)));
+    showNotice(ui.formError, t(first.key, Object.values(first.params || {}).map(String)), 'error');
     return;
   }
 
@@ -638,12 +633,12 @@ async function submit() {
     const result = await send(MSG.SUBMIT_CAPTURE, payload);
 
     if (result.queued === false && result.pdfError) {
-      showMessage(ui.formError, t('popup_pdf_failed', [result.pdfError]));
+      showNotice(ui.formError, t('popup_pdf_failed', [result.pdfError]), 'error');
       return;
     }
 
     if (result.done) {
-      showMessage(ui.formSuccess, successText(intent, result.outcome));
+      showNotice(ui.formSuccess, successText(intent, result.outcome), 'success');
       setTimeout(() => window.close(), 1400);
       return;
     }
@@ -651,7 +646,7 @@ async function submit() {
     // Nicht durchgekommen: liegt in der Warteschlange, geht nichts verloren.
     const job = result.job;
     const reason = job && job.lastError ? job.lastError.text : t('err_unknown');
-    showMessage(ui.formError, t('popup_queued', [reason]));
+    showNotice(ui.formError, t('popup_queued', [reason]), 'error');
     updateQueueChip(await refreshCounts());
   } catch (error) {
     showError(error);
@@ -698,34 +693,17 @@ function hideMessages() {
 }
 
 /**
- * @param {HTMLElement} node
- * @param {string} text
+ * @param {any} error
  */
-function showMessage(node, text) {
-  node.textContent = text;
-  node.hidden = false;
-}
-
-/** @param {any} error */
-function errorText(error) {
-  if (error && error.message) return error.message;
-  return t('err_unknown');
-}
-
-/** @param {any} error */
 function showError(error) {
-  if (error && error.auth) {
-    showTokenProblem(errorText(error));
-    return;
-  }
-  showMessage(ui.formError, errorText(error));
+  showUiError(error, { translate: t, onAuth: showTokenProblem, inline: ui.formError });
 }
 
 /** @param {any} error */
 function showFatal(error) {
   ui.loading.hidden = true;
   ui.tokenProblem.hidden = false;
-  ui.tokenProblemText.textContent = errorText(error);
+  ui.tokenProblemText.textContent = errorText(error, t);
 }
 
 /**

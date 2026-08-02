@@ -2,6 +2,9 @@
  * Nachrichtentypen zwischen Popup/Options und Service Worker.
  * Als Konstanten, damit ein Tippfehler beim Bauen auffaellt und nicht
  * erst als stumm verschluckte Nachricht zur Laufzeit.
+ *
+ * Reine Daten — kein `chrome`-Bezug. Der Versand (`send`) liegt in
+ * `src/ui/messaging.js`, weil er `chrome.runtime.sendMessage` braucht.
  */
 
 export const MSG = Object.freeze({
@@ -37,24 +40,4 @@ export const MSG = Object.freeze({
   SAVE_SETTINGS: 'save-settings',
   /** Standardbuch setzen. */
   SET_DEFAULT_BOOK: 'set-default-book',
-  /** Der Worker meldet der offenen UI eine Aenderung. */
-  STATE_CHANGED: 'state-changed',
 });
-
-/**
- * Kleiner Wrapper um `chrome.runtime.sendMessage`, der Fehler des Workers
- * als abgelehnte Promise weiterreicht statt sie zu verschlucken.
- *
- * @param {string} type
- * @param {Record<string, any>} [payload]
- * @returns {Promise<any>}
- */
-export async function send(type, payload = {}) {
-  const response = await chrome.runtime.sendMessage({ type, ...payload });
-  if (response && response.ok === false) {
-    const error = new Error(response.error?.message || 'request failed');
-    Object.assign(error, response.error || {});
-    throw error;
-  }
-  return response ? response.data : undefined;
-}

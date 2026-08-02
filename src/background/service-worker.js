@@ -13,40 +13,27 @@
 import { createApiClient, describeDevice } from './api-client.js';
 import { probeCapabilities } from './capabilities.js';
 import { runCaptureJob } from './capture-runner.js';
+import { createAttachmentStore } from './attachment-store.js';
+import { createHandlers, lookupHandler } from './handlers.js';
 import { createQueue } from './queue.js';
-import {
-  getCapabilities,
-  getConfig,
-  getSettings,
-  getTokenState,
-  loadQueue,
-  readState,
-  saveBooks,
-  saveDetectedCapabilities,
-  saveQueue,
-  saveSettings,
-  setCapabilityMode,
-  setTokenState,
-  writeState,
-} from './state.js';
+import { createStore } from './state.js';
+
+const store = createStore();
 
 import {
   BOOKS_TTL_MS,
   CAPABILITY_TTL_MS,
   JOB_STATE,
   STORAGE_KEYS,
-  TOKEN_PREFIX,
   TOKEN_STATE,
   canWriteToBook,
   capabilityEnabled,
 } from '../shared/config.js';
-import { ApiError, describeError } from '../shared/errors.js';
-import { t } from '../shared/i18n.js';
+import { ApiError, describeError, isRouteMissing } from '../shared/errors.js';
 import { summarizeDuplicates } from '../shared/duplicates.js';
 import { intentFromHarvest } from '../shared/intent.js';
 import { LIMITS, RESEARCH_LIST } from '../shared/limits.js';
-import { MSG } from '../shared/messages.js';
-import { fileNameFromUrl, normalizeServerUrl, toOriginPattern } from '../shared/url.js';
+import { t } from '../ui/chrome-i18n.js';
 
 const QUEUE_ALARM = 'schreibwerkstatt-queue';
 const CONTEXT_MENU_QUOTE = 'schreibwerkstatt-capture-quote';
@@ -55,29 +42,32 @@ const UNDO_NOTIFICATION_PREFIX = 'undo:';
 /** Chrome deckelt Alarme in gepackten Erweiterungen auf 30 s. */
 const MIN_ALARM_DELAY_MS = 30 * 1000;
 
+/** Einmalig beim Start des Workers abgefragt; konstant ueber seine Lebensdauer. */
+const EXTENSION_VERSION = chrome.runtime.getManifest().version;
+
 // ---------------------------------------------------------------------------
 // Grundbausteine
 // ---------------------------------------------------------------------------
 
 const api = createApiClient({
-  getConfig,
+  getConfig: store.getConfig,
   getClientInfo: async () => ({
     platform: 'chrome',
     device: describeDevice(navigator),
-    version: chrome.runtime.getManifest().version,
+    version: EXTENSION_VERSION,
   }),
   onAuthError: () => {
     // Nie stillschweigend erneut versuchen: Token markieren, Badge rot.
-    void setTokenState(TOKEN_STATE.INVALID).then(refreshBadge);
+    void store.setTokenState(TOKEN_STATE.INVALID).then(refreshBadge);
   },
   onScopeError: () => {
-    void setTokenState(TOKEN_STATE.SCOPE_MISSING).then(refreshBadge);
+    void store.setTokenState(TOKEN_STATE.SCOPE_MISSING).then(refreshBadge);
   },
 });
 
 const queue = createQueue({
-  load: loadQueue,
-  save: saveQueue,
+  load: store.loadQueue,
+  save: store.saveQueue,
   translate: t,
 });
 
@@ -129,17 +119,15 @@ function rememberOutcome(jobId, progress) {
  * Folge: ueberlebt ein Auftrag den Neustart des Workers, wird er ohne Anhang
  * gesendet. Der Verlust wird am Auftrag vermerkt und in den Optionen angezeigt
  * — er passiert nicht stillschweigend.
- *
- * @type {Map<string, Record<string, any>>}
  */
-const attachmentCache = new Map();
+const attachmentCache = createAttachmentStore();
 
 // ---------------------------------------------------------------------------
 // Badge
 // ---------------------------------------------------------------------------
 
 async function refreshBadge() {
-  const [tokenState, counts] = await Promise.all([getTokenState(), queue.counts()]);
+  const [tokenState, counts] = await Promise.all([store.getTokenState(), queue.counts()]);
 
   if (tokenState === TOKEN_STATE.INVALID || tokenState === TOKEN_STATE.SCOPE_MISSING) {
     await setBadge('!', '#c0392b', t('badge_token_problem'));
@@ -187,7 +175,7 @@ async function setBadge(text, color, title) {
  * @returns {Promise<{capture: boolean, byUrl: boolean, researchList: boolean, researchScopeMissing: boolean}>}
  */
 async function resolveCapabilities(allowProbe = true) {
-  let capabilities = await getCapabilities();
+  let capabilities = await store.getCapabilities();
 
   const needsProbe =
     (capabilities.capture.mode === 'auto' && capabilities.capture.detected === null) ||
@@ -196,12 +184,12 @@ async function resolveCapabilities(allowProbe = true) {
     Date.now() - (capabilities.probedAt || 0) > CAPABILITY_TTL_MS;
 
   if (allowProbe && needsProbe) {
-    const config = await getConfig();
-    const tokenState = await getTokenState();
+    const config = await store.getConfig();
+    const tokenState = await store.getTokenState();
     if (config.serverUrl && config.token && tokenState !== TOKEN_STATE.INVALID) {
       try {
         const detected = await probeCapabilities(api);
-        capabilities = await saveDetectedCapabilities(detected);
+        capabilities = await store.saveDetectedCapabilities(detected);
       } catch {
         // Probe ist Kuer. Fehlschlag heisst: Fallback-Pfad benutzen.
       }
@@ -218,8 +206,8 @@ async function resolveCapabilities(allowProbe = true) {
 
 /** @param {'capture'|'byUrl'|'researchList'} name */
 function markCapabilityMissing(name) {
-  void getCapabilities().then((capabilities) =>
-    saveDetectedCapabilities({
+  void store.getCapabilities().then((capabilities) =>
+    store.saveDetectedCapabilities({
       capture: name === 'capture' ? false : capabilities.capture.detected,
       byUrl: name === 'byUrl' ? false : capabilities.byUrl.detected,
       researchList: name === 'researchList' ? false : capabilities.researchList.detected,
@@ -244,8 +232,8 @@ async function checkSourceDuplicate(capabilities, message) {
     return { supported: true, found: true, source: found.source, linkedToBook: !!found.linked_to_book };
   } catch (error) {
     const err = /** @type {any} */ (error);
-    if (err.status === 404) return { supported: true, found: false };
-    if ((err.status === 404 || err.status === 405) && err.jsonBody !== true) {
+    if (err.status === 404 && err.jsonBody === true) return { supported: true, found: false };
+    if (isRouteMissing(err)) {
       markCapabilityMissing('byUrl');
       return { supported: false };
     }
@@ -285,14 +273,14 @@ async function checkResearchDuplicate(capabilities, message) {
   } catch (error) {
     const err = /** @type {any} */ (error);
 
-    if ((err.status === 404 || err.status === 405) && err.jsonBody !== true) {
+    if (isRouteMissing(err)) {
       markCapabilityMissing('researchList');
       return { supported: false };
     }
 
     // Fehlender Scope ist ein Befund ueber das Token: melden, nicht wiederholen.
     if (err.status === 403 && err.code === 'DEVICE_SCOPE_FORBIDDEN') {
-      void saveDetectedCapabilities({ researchList: true, researchScopeMissing: true });
+      void store.saveDetectedCapabilities({ researchList: true, researchScopeMissing: true });
       return { supported: false, scopeMissing: true, error: describeError(err, t) };
     }
 
@@ -404,15 +392,15 @@ async function captureScreenshot(windowId) {
  * @returns {Promise<Array<Record<string, any>>>}
  */
 async function fetchBooks(force = false) {
-  const state = await readState();
+  const state = await store.readState();
   const age = Date.now() - (state[STORAGE_KEYS.BOOKS_FETCHED_AT] || 0);
   if (!force && state[STORAGE_KEYS.BOOKS].length && age < BOOKS_TTL_MS) {
     return state[STORAGE_KEYS.BOOKS];
   }
 
   const books = await api.getBooks();
-  await saveBooks(books);
-  await setTokenState(TOKEN_STATE.VALID);
+  await store.saveBooks(books);
+  await store.setTokenState(TOKEN_STATE.VALID);
   await refreshBadge();
 
   // Ein Standardbuch, das es nicht mehr gibt oder in dem wir nur lesen
@@ -421,7 +409,7 @@ async function fetchBooks(force = false) {
   if (current !== null && current !== undefined) {
     const book = books.find((entry) => String(entry.id) === String(current));
     if (!book || !canWriteToBook(book)) {
-      await writeState({ [STORAGE_KEYS.DEFAULT_BOOK_ID]: null });
+      await store.writeState({ [STORAGE_KEYS.DEFAULT_BOOK_ID]: null });
     }
   }
 
@@ -515,7 +503,7 @@ async function scheduleNextWake() {
  * @param {chrome.notifications.NotificationOptions} options
  */
 async function notify(id, options) {
-  const settings = await getSettings();
+  const settings = await store.getSettings();
   if (!settings.notifications) return;
   if (!chrome.notifications) return;
   try {
@@ -597,7 +585,7 @@ async function installContextMenus() {
 async function captureQuoteFromTab(tab, fallbackSelection = '') {
   if (!tab || tab.id === undefined) return;
 
-  const state = await readState();
+  const state = await store.readState();
   const settings = state[STORAGE_KEYS.SETTINGS];
   const bookId = state[STORAGE_KEYS.DEFAULT_BOOK_ID];
 
@@ -674,182 +662,43 @@ async function captureQuoteFromTab(tab, fallbackSelection = '') {
 // ---------------------------------------------------------------------------
 
 /**
+ * Kontext fuer alle Handler: alles, was ausserhalb einer einzelnen
+ * `case`-Marke liegen muss — Queue, Anhang-Cache, Chrome-Helfer. So
+ * bleibt der Service Worker die einzige Datei, die Chrome-Ereignisse
+ * verdrahtet; `handlers.js` routet nur noch.
+ */
+const handlerCtx = {
+  api,
+  queue,
+  store,
+  refreshBadge,
+  processQueue,
+  scheduleNextWake,
+  resolveCapabilities,
+  markCapabilityMissing,
+  checkSourceDuplicate,
+  checkResearchDuplicate,
+  fetchBooks,
+  probeCapabilities,
+  harvestTab,
+  captureScreenshot,
+  fetchPdfInPage,
+  activeTab,
+  notify,
+  attachmentCache,
+  lastOutcome,
+  showUndoNotification,
+  extensionVersion: () => EXTENSION_VERSION,
+};
+
+const handlers = createHandlers(handlerCtx);
+
+/**
  * @param {any} message
  * @param {chrome.runtime.MessageSender} sender
  */
 async function handleMessage(message, sender) {
-  switch (message.type) {
-    case MSG.GET_STATE: {
-      const state = await readState();
-      const counts = await queue.counts();
-      return {
-        serverUrl: state[STORAGE_KEYS.SERVER_URL],
-        hasToken: !!state[STORAGE_KEYS.TOKEN],
-        tokenState: state[STORAGE_KEYS.TOKEN_STATE],
-        defaultBookId: state[STORAGE_KEYS.DEFAULT_BOOK_ID],
-        books: state[STORAGE_KEYS.BOOKS],
-        booksFetchedAt: state[STORAGE_KEYS.BOOKS_FETCHED_AT],
-        capabilities: state[STORAGE_KEYS.CAPABILITIES],
-        settings: state[STORAGE_KEYS.SETTINGS],
-        queue: state[STORAGE_KEYS.QUEUE],
-        counts,
-        version: chrome.runtime.getManifest().version,
-      };
-    }
-
-    case MSG.HARVEST_ACTIVE_TAB: {
-      const tab = await activeTab();
-      if (!tab || tab.id === undefined) throw new ApiError({ code: 'NO_ACTIVE_TAB' });
-      const settings = await getSettings();
-      const harvested = await harvestTab(tab.id, {
-        includeArticleText: message.includeArticleText ?? settings.harvestArticleText,
-      });
-      return { harvested, tab: { id: tab.id, url: tab.url, title: tab.title, windowId: tab.windowId } };
-    }
-
-    case MSG.REFRESH_BOOKS:
-      return { books: await fetchBooks(true) };
-
-    case MSG.TEST_CONNECTION: {
-      const books = await fetchBooks(true);
-      const detected = await probeCapabilities(api);
-      const capabilities = await saveDetectedCapabilities(detected);
-      return { books, capabilities, tokenState: await getTokenState() };
-    }
-
-    case MSG.CHECK_DUPLICATE: {
-      const capabilities = await resolveCapabilities(true);
-      const [source, research] = await Promise.all([
-        checkSourceDuplicate(capabilities, message),
-        checkResearchDuplicate(capabilities, message),
-      ]);
-      return { source, research };
-    }
-
-    case MSG.LOOKUP_METADATA:
-      return api.lookup({ doi: message.doi, isbn: message.isbn });
-
-    case MSG.CAPTURE_SCREENSHOT: {
-      const tab = await activeTab();
-      if (!tab || tab.windowId === undefined) throw new ApiError({ code: 'NO_ACTIVE_TAB' });
-      return captureScreenshot(tab.windowId);
-    }
-
-    case MSG.SUBMIT_CAPTURE: {
-      /** @type {import('../shared/config.js').CaptureIntent} */
-      const intent = message.intent;
-
-      /** @type {Record<string, any>} */
-      const attachments = {};
-
-      // PDF erst jetzt holen — im Seitenkontext, solange der Tab noch da ist.
-      if (message.attachPdf && message.pdfUrl && message.tabId !== undefined) {
-        const result = await fetchPdfInPage(message.tabId, message.pdfUrl);
-        if (result.base64) {
-          attachments.pdf = {
-            bytes: result.base64,
-            size: result.size,
-            // Der Vertrag nimmt den Dateinamen als `?name=`; ohne ihn heisst der
-            // Anhang in der App nur „Dokument".
-            name: fileNameFromUrl(message.pdfUrl),
-          };
-        } else {
-          return { queued: false, pdfError: result.error || 'FETCH_FAILED' };
-        }
-      }
-
-      if (message.screenshot && message.screenshot.base64) {
-        attachments.screenshot = {
-          bytes: message.screenshot.base64,
-          contentType: message.screenshot.contentType,
-        };
-      }
-
-      // Die Nutzdaten bleiben im Speicher, nur die Absicht wird persistiert.
-      intent.attachments = {};
-      intent.attachmentsDeclared = {
-        screenshot: !!attachments.screenshot,
-        pdf: !!attachments.pdf,
-      };
-
-      const job = await queue.add(intent, { holdMs: 0 });
-      if (attachments.screenshot || attachments.pdf) attachmentCache.set(job.id, attachments);
-      await refreshBadge();
-      // Sofort versuchen; bei Erfolg ist der Auftrag beim Antworten schon weg.
-      await processQueue();
-      const remaining = await queue.list();
-      const stillThere = remaining.find((entry) => entry.id === job.id);
-      const outcome = lastOutcome.get(job.id) || null;
-      lastOutcome.delete(job.id);
-      return {
-        queued: true,
-        jobId: job.id,
-        done: !stillThere,
-        job: stillThere || null,
-        // Was der Server gemeldet hat — damit das Popup „angelegt" von
-        // „war schon drin" unterscheiden kann.
-        outcome,
-      };
-    }
-
-    case MSG.FLUSH_QUEUE:
-      await processQueue();
-      return { counts: await queue.counts() };
-
-    case MSG.RETRY_JOB:
-      await queue.retryNow(message.jobId);
-      await processQueue();
-      return { counts: await queue.counts() };
-
-    case MSG.UNDO_JOB: {
-      const undone = await queue.undo(message.jobId);
-      if (undone) attachmentCache.delete(message.jobId);
-      await refreshBadge();
-      return { undone };
-    }
-
-    case MSG.DISCARD_JOB:
-      await queue.discard(message.jobId);
-      attachmentCache.delete(message.jobId);
-      await refreshBadge();
-      return { counts: await queue.counts() };
-
-    case MSG.SET_CAPABILITY_MODE:
-      return { capabilities: await setCapabilityMode(message.name, message.mode) };
-
-    case MSG.SAVE_CREDENTIALS: {
-      const serverUrl = normalizeServerUrl(message.serverUrl);
-      if (!serverUrl) throw new ApiError({ code: 'INVALID_SERVER_URL', status: 400 });
-
-      const token = String(message.token || '').trim();
-      await writeState({
-        [STORAGE_KEYS.SERVER_URL]: serverUrl,
-        ...(token ? { [STORAGE_KEYS.TOKEN]: token } : {}),
-        [STORAGE_KEYS.TOKEN_STATE]: TOKEN_STATE.UNKNOWN,
-        // Ein Serverwechsel macht Buecher und Faehigkeits-Befunde ungueltig.
-        [STORAGE_KEYS.BOOKS]: [],
-        [STORAGE_KEYS.BOOKS_FETCHED_AT]: 0,
-      });
-      await saveDetectedCapabilities({
-        capture: null,
-        byUrl: null,
-        researchList: null,
-        researchScopeMissing: false,
-      });
-      await refreshBadge();
-      return { serverUrl, originPattern: toOriginPattern(serverUrl), tokenLooksValid: token.startsWith(TOKEN_PREFIX) };
-    }
-
-    case MSG.SAVE_SETTINGS:
-      return { settings: await saveSettings(message.settings || {}) };
-
-    case MSG.SET_DEFAULT_BOOK:
-      await writeState({ [STORAGE_KEYS.DEFAULT_BOOK_ID]: message.bookId ?? null });
-      return { defaultBookId: message.bookId ?? null };
-
-    default:
-      throw new ApiError({ code: 'UNKNOWN_MESSAGE', message: String(message.type) });
-  }
+  return lookupHandler(handlers, message.type)(message, sender);
 }
 
 // ---------------------------------------------------------------------------

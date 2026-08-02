@@ -11,7 +11,7 @@
  * Recherche-Item wird nie ein zweites Mal erzeugt.
  */
 
-import { ApiError } from '../shared/errors.js';
+import { ApiError, isRouteMissing } from '../shared/errors.js';
 import {
   LIMITS,
   clampCapturePayload,
@@ -175,14 +175,37 @@ async function tryUnifiedCapture(job, ctx) {
     return true;
   } catch (error) {
     const err = /** @type {any} */ (error);
-    const routeMissing = (err.status === 404 || err.status === 405) && err.jsonBody !== true;
-    if (routeMissing) {
+    if (isRouteMissing(err)) {
       log('capture-endpoint-missing');
       if (onCapabilityMissing) onCapabilityMissing('capture');
       return false; // auf den Vier-Request-Pfad zurueckfallen
     }
     throw error;
   }
+}
+
+/**
+ * Bibliografische Felder, die `POST /sources` und `POST /capture` gemeinsam
+ * erwarten — ohne `title` und `url`, weil die beiden Endpunkte sie aus
+ * unterschiedlichen Quellen ziehen, und ohne `citekey`, das nur `/sources`
+ * annimmt (siehe `unifiedCaptureFits`).
+ *
+ * @param {Record<string, any>} draft
+ */
+function sourceFields(draft) {
+  return {
+    authors: Array.isArray(draft.authors) ? draft.authors : [],
+    editors: Array.isArray(draft.editors) ? draft.editors : [],
+    container_title: draft.container_title || '',
+    publisher: draft.publisher || '',
+    place: draft.place || '',
+    year: draft.year || null,
+    doi: draft.doi || '',
+    isbn: draft.isbn || '',
+    csl_type: draft.csl_type || 'website',
+    accessed_at: draft.accessed_at || '',
+    note: draft.note || '',
+  };
 }
 
 /**
@@ -196,6 +219,10 @@ async function tryUnifiedCapture(job, ctx) {
  * `source` traegt wie in `POST /research` die Herkunfts-URL als String;
  * `url` ist die Adresse, aus der der Server die Quelle bildet.
  *
+ * Die bibliografischen Felder stammen aus `sourceFields` — derselbe Ort, an
+ * dem auch `buildSourcePayload` sie zieht. So kann der bessere Weg nicht das
+ * schlechtere Ergebnis liefern.
+ *
  * @param {import('../shared/config.js').CaptureIntent} intent
  * @returns {{ payload: Record<string, any>, truncations: import('../shared/limits.js').Truncation[] }}
  */
@@ -203,30 +230,19 @@ export function buildCapturePayload(intent) {
   const draft = intent.source || {};
   const url = intent.normalizedUrl || intent.url || '';
 
-  return clampCapturePayload(
-    {
-      book_id: intent.bookId,
-      mode: intent.mode,
-      url: draft.url || url,
-      title: intent.title,
-      body: intent.body,
-      kind: intent.kind,
-      tags: Array.isArray(intent.tags) ? intent.tags : [],
-      source: url,
-      authors: Array.isArray(draft.authors) ? draft.authors : [],
-      editors: Array.isArray(draft.editors) ? draft.editors : [],
-      container_title: draft.container_title || '',
-      publisher: draft.publisher || '',
-      place: draft.place || '',
-      year: draft.year || null,
-      doi: draft.doi || '',
-      isbn: draft.isbn || '',
-      csl_type: draft.csl_type || 'website',
-      accessed_at: draft.accessed_at || '',
-      note: draft.note || '',
-    },
-    { verbatimBody: isVerbatim(intent) },
-  );
+  const payload = {
+    book_id: intent.bookId,
+    mode: intent.mode,
+    url: draft.url || url,
+    title: intent.title,
+    body: intent.body,
+    kind: intent.kind,
+    tags: Array.isArray(intent.tags) ? intent.tags : [],
+    source: url,
+    ...sourceFields(draft),
+  };
+
+  return clampCapturePayload(payload, { verbatimBody: isVerbatim(intent) });
 }
 
 /**
@@ -292,21 +308,12 @@ export function buildResearchPayload(intent) {
  */
 export function buildSourcePayload(intent) {
   const draft = intent.source || {};
+  const fallbackUrl = intent.normalizedUrl || intent.url || '';
   /** @type {Record<string, any>} */
   const payload = {
-    csl_type: draft.csl_type || 'website',
     title: draft.title || '',
-    authors: Array.isArray(draft.authors) ? draft.authors : [],
-    editors: Array.isArray(draft.editors) ? draft.editors : [],
-    container_title: draft.container_title || '',
-    publisher: draft.publisher || '',
-    place: draft.place || '',
-    year: draft.year || null,
-    url: draft.url || intent.normalizedUrl || intent.url || '',
-    doi: draft.doi || '',
-    isbn: draft.isbn || '',
-    accessed_at: draft.accessed_at || '',
-    note: draft.note || '',
+    url: draft.url || fallbackUrl,
+    ...sourceFields(draft),
   };
   if (hasText(draft.citekey)) payload.citekey = draft.citekey.trim();
   return clampSourcePayload(payload);
@@ -340,8 +347,7 @@ async function createOrReuseSource(job, ctx) {
       }
     } catch (error) {
       const err = /** @type {any} */ (error);
-      const routeMissing = (err.status === 404 || err.status === 405) && err.jsonBody !== true;
-      if (routeMissing && onCapabilityMissing) onCapabilityMissing('byUrl');
+      if (isRouteMissing(err) && onCapabilityMissing) onCapabilityMissing('byUrl');
       // 404 heisst hier schlicht: noch nicht in der Bibliothek. Weitermachen.
       if (err.status !== 404 && err.status !== 405) throw error;
     }

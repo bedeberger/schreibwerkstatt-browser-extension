@@ -19,10 +19,16 @@
 const PROBE_URL = 'https://example.com/schreibwerkstatt-probe';
 
 /**
+ * Wertet einen API-Fehler in ein Faehigkeits-Urteil um.
+ *
+ *   404/405 ohne JSON-Koerper         -> false  (Route fehlt)
+ *   4xx MIT JSON `error_code`        -> true   (Route existiert, Anfrage ungueltig)
+ *   401/403/429/Netzfehler           -> null   (keine Aussage moeglich)
+ *
  * @param {unknown} error
  * @returns {boolean|null}
  */
-function verdictFromError(error) {
+export function verdictFromError(error) {
   const err = /** @type {any} */ (error);
   if (!err) return null;
   if (err.networkError) return null;
@@ -50,7 +56,7 @@ function verdictFromError(error) {
  * @param {ReturnType<import('./api-client.js').createApiClient>} api
  * @returns {Promise<boolean|null>}
  */
-export async function probeByUrl(api) {
+async function probeByUrl(api) {
   try {
     await api.findSourceByUrl(PROBE_URL, '');
     return true;
@@ -66,7 +72,7 @@ export async function probeByUrl(api) {
  * @param {ReturnType<import('./api-client.js').createApiClient>} api
  * @returns {Promise<boolean|null>}
  */
-export async function probeCapture(api) {
+async function probeCapture(api) {
   try {
     await api.capture({});
     // Unerwartet, aber eindeutig: der Endpunkt existiert.
@@ -124,5 +130,3 @@ export async function probeCapabilities(api) {
     researchScopeMissing: research.scopeMissing,
   };
 }
-
-export const __testing = { verdictFromError, PROBE_URL };

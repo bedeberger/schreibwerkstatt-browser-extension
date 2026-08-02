@@ -346,6 +346,18 @@ export function isScopeError(error = {}) {
 }
 
 /**
+ * Antwortet der Server mit `404`/`405` als HTML (kein `error_code`), fehlt die
+ * Route. Ein fachliches 404 hingegen traegt `error_code` (z. B. `NOT_FOUND`)
+ * und bedeutet „kenne ich, aber nicht da" — kein Hinweis auf eine fehlende
+ * Route. Genau dasselbe Muster steht in `capabilities.js` und `capture-runner.js`.
+ *
+ * @param {{status?: number, jsonBody?: boolean}} error
+ */
+export function isRouteMissing(error = {}) {
+  return (error.status === 404 || error.status === 405) && error.jsonBody !== true;
+}
+
+/**
  * Baut den anzeigbaren Text. Der Code steht immer dabei.
  *
  * @param {{status?: number, code?: string, params?: Record<string, any>, message?: string, networkError?: boolean}} error

@@ -1,39 +1,34 @@
 /**
- * Bruecke zu `chrome.i18n` plus ein kleiner DOM-Lokalisierer.
+ * Reine i18n-Logik ohne chrome-Abhaengigkeit — direkt testbar.
  *
- * In HTML werden Strings nie hartcodiert, sondern deklariert:
- *   <span data-i18n="popup_title"></span>
- *   <input data-i18n-attr="placeholder:popup_tags_placeholder">
+ * `t` ist hier die Identitaet (gibt den Schluessel zurueck). Die chrome-Bruecke
+ * in `src/ui/chrome-i18n.js` liefert die uebersetzte Fassung und bindet
+ * `applyI18n`/`formatRelativeTime` an sich.
  */
 
 /**
+ * Identitaet — in Tests kann hier jede beliebige Uebersetzer-Attrappe
+ * übergeben werden.
  * @param {string} key
- * @param {string[]} [substitutions]
+ * @param {string[]} [_substitutions]
  * @returns {string}
  */
-export function t(key, substitutions) {
-  if (typeof chrome !== 'undefined' && chrome.i18n && typeof chrome.i18n.getMessage === 'function') {
-    const value = chrome.i18n.getMessage(key, substitutions);
-    if (value) return value;
-  }
+export function t(key, _substitutions) {
   return key;
 }
 
 /**
- * Uebersetzer in der Signatur, die `describeError` erwartet.
- * @type {(key: string, substitutions?: string[]) => string}
- */
-export const translate = (key, substitutions) => t(key, substitutions);
-
-/**
- * Ersetzt alle `data-i18n`-Marker unterhalb von `root`.
+ * Ersetzt alle `data-i18n`-Marker unterhalb von `root` mit Hilfe des
+ * uebergebenen Uebersetzers.
+ *
  * @param {ParentNode} [root]
+ * @param {(key: string, substitutions?: string[]) => string} [translate]
  */
-export function applyI18n(root = document) {
+export function applyI18n(root = document, translate = t) {
   for (const node of root.querySelectorAll('[data-i18n]')) {
     const key = node.getAttribute('data-i18n');
     if (!key) continue;
-    const value = t(key);
+    const value = translate(key);
     if (value && value !== key) node.textContent = value;
   }
 
@@ -43,39 +38,32 @@ export function applyI18n(root = document) {
     for (const pair of spec.split(',')) {
       const [attr, key] = pair.split(':').map((part) => part.trim());
       if (!attr || !key) continue;
-      const value = t(key);
+      const value = translate(key);
       if (value && value !== key) node.setAttribute(attr, value);
     }
   }
 
-  if (root === document) {
+  // Titel- und lang-Ersetzung sind nur sinnvoll, wenn `root` actually das
+  // Dokument ist. In Tests (JSDOM) existiert der globale `document` nicht;
+  // der Aufrufer uebergibt das JSDOM-Dokument, nicht das globale.
+  if (typeof document !== 'undefined' && root === document) {
     const title = document.querySelector('title[data-i18n]');
     if (title) document.title = title.textContent || document.title;
-    const lang = t('lang_code');
+    const lang = translate('lang_code');
     if (lang && lang !== 'lang_code') document.documentElement.lang = lang;
   }
 }
 
 /**
- * Formatiert eine Zahl in der UI-Sprache.
- * @param {number} value
- */
-export function formatNumber(value) {
-  try {
-    return new Intl.NumberFormat(t('lang_code') === 'de' ? 'de-DE' : 'en-GB').format(value);
-  } catch {
-    return String(value);
-  }
-}
-
-/**
  * Relativer Zeitpunkt ("vor 3 Minuten") ohne externe Bibliothek.
+ *
  * @param {number} timestamp
  * @param {number} [now]
+ * @param {(key: string, substitutions?: string[]) => string} [translate]
  */
-export function formatRelativeTime(timestamp, now = Date.now()) {
+export function formatRelativeTime(timestamp, now = Date.now(), translate = t) {
   if (!timestamp) return '';
-  const locale = t('lang_code') === 'de' ? 'de-DE' : 'en-GB';
+  const locale = translate('lang_code') === 'de' ? 'de-DE' : 'en-GB';
   const deltaSeconds = Math.round((timestamp - now) / 1000);
   const units = /** @type {const} */ ([
     ['year', 31536000],

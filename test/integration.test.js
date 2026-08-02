@@ -684,9 +684,11 @@ describe('Erfassung: /capture-Pfad', () => {
   });
 
   it('mit citekey nimmt der Auftrag den Fallback-Pfad — /capture kennt das Feld nicht', async () => {
-    // Der dokumentierte Koerper von `/capture` fuehrt kein `citekey`. Ihn
-    // mitzuschicken waere ein erfundenes Feld, ihn wegzulassen stiller
-    // Datenverlust. Also den Weg nehmen, der ihn uebertraegt.
+    // `/capture` nimmt bewusst keinen `citekey` — der Zitierschluessel ist
+    // Sache des Autors, `409 CITEKEY_TAKEN` deckt dort nur den Wettlauf ab
+    // (geklaert am 2026-08-02). Ihn mitzuschicken waere ein erfundenes Feld,
+    // ihn wegzulassen stiller Datenverlust. Also dauerhaft den Weg nehmen,
+    // der ihn uebertraegt — das ist kein Provisorium.
     const server = await startMockServer({ hasCapture: true });
     try {
       const { api } = makeClient(server);

@@ -261,10 +261,13 @@ function isVerbatim(intent) {
 /**
  * Kann dieser Auftrag ueberhaupt ueber `POST /capture` gehen?
  *
- * Der dokumentierte Koerper von `/capture` kennt kein `citekey`. Wer einen
- * vergeben hat, muss deshalb den Fallback-Pfad nehmen — dort nimmt
- * `POST /sources` ihn an. Ihn auf dem Ein-Request-Pfad einfach mitzuschicken
- * waere ein erfundenes Feld; ihn wegzulassen waere stiller Datenverlust.
+ * `/capture` kennt kein `citekey`, und zwar mit Absicht: der Zitierschluessel
+ * ist Sache der Autorin oder des Autors, `409 CITEKEY_TAKEN` deckt dort nur
+ * den Wettlauf zweier gleichzeitiger Anfragen ab (geklaert am 2026-08-02).
+ * Wer einen vergeben hat, nimmt deshalb dauerhaft den Fallback-Pfad — dort
+ * nimmt `POST /sources` ihn an. Ihn auf dem Ein-Request-Pfad einfach
+ * mitzuschicken waere ein erfundenes Feld; ihn wegzulassen waere stiller
+ * Datenverlust.
  *
  * @param {import('../shared/config.js').CaptureIntent} intent
  */

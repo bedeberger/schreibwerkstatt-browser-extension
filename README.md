@@ -448,8 +448,8 @@ antwortet bei Überschreitung mit einem nackten `413` als HTML-Seite — ohne
 
 ## Getroffene Annahmen
 
-Vier Stellen des Vertrags waren beim Bauen nicht eindeutig. Drei sind inzwischen
-gegen den Server geprüft; so steht es jetzt:
+Vier Stellen des Vertrags waren beim Bauen nicht eindeutig. Alle vier sind
+inzwischen gegen den Server geprüft; so steht es jetzt:
 
 1. **`source` in `POST /research`** trägt die Herkunfts-URL als String
    (die normalisierte Fassung). Zusätzliche Links — kanonische URL, PDF — gehen
@@ -472,10 +472,12 @@ gegen den Server geprüft; so steht es jetzt:
 
 4. **`POST /capture` nimmt keinen `citekey`.** Der dokumentierte Körper führt das
    Feld nicht auf — obwohl `409 CITEKEY_TAKEN` als Fehlercode dieses Endpunkts
-   dasteht. **Offen.** Bis das geklärt ist, nimmt ein Auftrag mit eigenem
-   Zitierschlüssel nicht den Ein-Request-Pfad, sondern den Fallback, wo
-   `POST /sources` den `citekey` nachweislich annimmt. Kein erfundenes Feld, kein
-   stiller Verlust — ein Request mehr.
+   dasteht. **Geklärt:** der Endpunkt nimmt bewusst keinen; der Zitierschlüssel
+   ist Sache der Autorin oder des Autors, und `409 CITEKEY_TAKEN` deckt dort nur
+   den Wettlauf zweier gleichzeitiger Anfragen ab. Ein Auftrag mit eigenem
+   Zitierschlüssel nimmt deshalb dauerhaft nicht den Ein-Request-Pfad, sondern
+   den Fallback, wo `POST /sources` den `citekey` annimmt. Kein erfundenes Feld,
+   kein stiller Verlust — ein Request mehr, und das bleibt so.
 
 Die ersten beiden und die vierte stecken in `src/background/capture-runner.js`,
 die dritte in `src/shared/duplicates.js`; alle sind mit Tests in

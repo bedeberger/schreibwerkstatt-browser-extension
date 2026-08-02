@@ -78,7 +78,9 @@ Client heute nutzt — die Lesepfade `GET /research/tags`, `GET /sources`,
 
 > **Stand:** gegen `../schreibwerkstatt` bei Commit `ff4e3cae` geprüft (2026-08-01),
 > Fehlercodes und Grenzwerte gegen die Vertragstabelle in `docs/clients.md`
-> nachgezogen. Wer den Vertrag erneut abgleicht, aktualisiert diese Zeile mit.
+> nachgezogen; am 2026-08-02 erneut gegen `docs/clients.md` abgeglichen
+> (`X-Client-Version`, `citekey` in `POST /capture`). Wer den Vertrag erneut
+> abgleicht, aktualisiert diese Zeile mit.
 
 ### `GET /research` — Lesepfad
 
@@ -153,14 +155,15 @@ einfach aus. `403 DEVICE_SCOPE_FORBIDDEN` ist dagegen ein Befund über das Token
 und wird gemeldet, nicht wiederholt — und färbt den globalen Token-Zustand
 nicht ein, weil das Erfassen davon unberührt bleibt.
 
-### Offene Abweichungen Client → Server
+### Abgearbeitete Abweichungen Client → Server
 
-Aus dem Abgleich vom 2026-08-01. Alle sind **clientseitig** zu beheben; keine
-davon verlangt eine Serveränderung. Wer eine erledigt, streicht sie hier.
+Aus dem Abgleich vom 2026-08-01. Alle waren **clientseitig** zu beheben; keine
+davon verlangte eine Serveränderung.
 
-Die Punkte 1–7 sind am 2026-08-01 abgearbeitet. Sie bleiben mit Begründung
-stehen, weil jeder davon eine Regel hinterlässt, an die sich der nächste Abgleich
-halten soll — nicht als Aufgabenliste.
+**Es ist derzeit keine offen** — die Punkte 1–7 am 2026-08-01, die Punkte 8 und
+9 am 2026-08-02. Die Liste bleibt trotzdem stehen: jeder Punkt hinterlässt eine
+Regel, an die sich der nächste Abgleich halten soll. Sie ist eine Regelsammlung,
+keine Aufgabenliste. Wer eine neue Abweichung findet, hängt sie hier an.
 
 1. ~~**`POST /sources/:id/pdf` existiert nicht.**~~ *Erledigt.* Der Endpunkt heißt
    `doc` (`routes/sources-doc.js`); `api.uploadSourceDoc()` ruft ihn auf, mit
@@ -224,21 +227,22 @@ halten soll — nicht als Aufgabenliste.
    *Befunde*. `mode` ist die Vorgabe des Nutzers aus den Optionen und bleibt
    stehen — zumal `SAVE_CREDENTIALS` auch feuert, wenn nur der Token neu ist.
 
-### Befund für das Mutterprojekt (nicht hier zu lösen)
+### `POST /capture` und der `citekey` — geklärt
 
-**Der dokumentierte Body von `POST /capture` führt kein `citekey`** — obwohl
-`409 CITEKEY_TAKEN` als Fehlercode *dieses* Endpunkts in der Tabelle steht. Beides
-zugleich kann nicht stimmen: entweder nimmt die Route einen `citekey` an und der
-Body-Vertrag ist unvollständig, oder sie nimmt keinen und der Fehlercode ist dort
-unerreichbar.
+Die Frage war: der dokumentierte Body von `POST /capture` führt kein `citekey`,
+obwohl `409 CITEKEY_TAKEN` als Fehlercode *dieses* Endpunkts in der Tabelle steht.
 
-Der Client tut nach der harten Regel das Konservative: liegt ein `citekey` vor,
-geht der Auftrag **nicht** über `/capture`, sondern über den Fallback-Pfad, wo
-`POST /sources` ihn nachweislich annimmt (`unifiedCaptureFits()` in
-[capture-runner.js](src/background/capture-runner.js), festgenagelt mit einem
-Test). Kein erfundenes Feld, kein stiller Datenverlust — aber ein Request mehr,
-solange die Frage offen ist. Sie gehört als Prompt ins Mutterprojekt, nach der
-Vorlage unten.
+**Beantwortet am 2026-08-02:** die Route nimmt bewusst keinen `citekey` an —
+`routes/capture.js` baut ihn nicht. Der Zitierschlüssel ist Sache der Autorin
+oder des Autors; `409 CITEKEY_TAKEN` deckt dort nur den Wettlauf zweier
+gleichzeitiger Anfragen ab. Der Fehlercode ist also richtig und der Body
+vollständig.
+
+Damit ist `unifiedCaptureFits()` in
+[capture-runner.js](src/background/capture-runner.js) kein Provisorium mehr,
+sondern die dauerhaft richtige Regel: liegt ein `citekey` vor, geht der Auftrag
+über den Fallback-Pfad, wo `POST /sources` ihn annimmt. Ein Request mehr, und
+das bleibt so. Kein Prompt ans Mutterprojekt nötig.
 
 ---
 

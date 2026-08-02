@@ -118,19 +118,23 @@ export function createStore({
   }
 
   /**
-   * Setzt alle Faehigkeits-Befunde explizit zurueck.
+   * Setzt alle Faehigkeits-BEFUNDE explizit zurueck.
    *
    * `saveDetectedCapabilities({ capture: null, ... })` wuerde die Werte trotz
    * `null`-Argumenten BEHALTEN (siehe `pick` weiter unten), denn `null` heisst
    * in der Sprechweise der Probe „keine Aussage". Diese Funktion hier meint
    * tatsaechlich „vergiss alles" — nach einem Serverwechsel sind die Befunde
    * des vorigen Servers wertlos.
+   *
+   * `mode` bleibt jedoch stehen: das ist kein Befund, sondern die Vorgabe des
+   * Nutzers aus den Optionen. Sie gilt weiter, auch fuer den neuen Server.
    */
   async function resetDetectedCapabilities() {
+    const current = await getCapabilities();
     const next = {
-      capture: { mode: CAPABILITY_MODE.AUTO, detected: null },
-      byUrl: { mode: CAPABILITY_MODE.AUTO, detected: null },
-      researchList: { mode: CAPABILITY_MODE.AUTO, detected: null, scopeMissing: false },
+      capture: { mode: current.capture.mode, detected: null },
+      byUrl: { mode: current.byUrl.mode, detected: null },
+      researchList: { mode: current.researchList.mode, detected: null, scopeMissing: false },
       probedAt: 0,
     };
     await writeState({ [STORAGE_KEYS.CAPABILITIES]: next });

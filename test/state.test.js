@@ -117,6 +117,19 @@ describe('createStore', () => {
     assert.equal(caps.probedAt, 0, 'ProbedAt wird null, nicht ueberall');
   });
 
+  it('resetDetectedCapabilities laesst den vom Nutzer gesetzten Modus stehen', async () => {
+    // `mode` ist kein Befund ueber den Server, sondern die Vorgabe aus den
+    // Optionen. Sie mit zurueckzusetzen waere stiller Verlust einer Eingabe —
+    // zumal `SAVE_CREDENTIALS` auch feuert, wenn nur der Token neu ist.
+    const storage = memoryStorage();
+    const store = createStore({ storage });
+    await store.setCapabilityMode('capture', 'off');
+    await store.saveDetectedCapabilities({ capture: true });
+    const caps = await store.resetDetectedCapabilities();
+    assert.equal(caps.capture.mode, 'off');
+    assert.equal(caps.capture.detected, null);
+  });
+
   it('setCapabilityMode: falscher Modus wird abgewiesen, sonst Patch', async () => {
     const storage = memoryStorage();
     const store = createStore({ storage });

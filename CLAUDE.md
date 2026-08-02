@@ -212,14 +212,17 @@ halten soll — nicht als Aufgabenliste.
    und „Doppelklick-Schutz" standen hier zu Unrecht: beides entscheidet der
    Server (`GET /sources/by-url`, Idempotenzfenster), der Client vergleicht dort
    nichts.
-9. **Der Serverwechsel setzt die Fähigkeits-Befunde nicht zurück.**
-   `saveDetectedCapabilities({ capture: null, … })` in
-   [service-worker.js](src/background/service-worker.js) meint „zurücksetzen",
-   aber `pick()` in [state.js](src/background/state.js) liest `null` als „keine
-   Aussage" und behält den alten Wert. Nach einem Serverwechsel gelten deshalb
-   die Befunde des vorigen Servers weiter, bis die TTL von 24 h abläuft.
-   Bestand schon vorher; für den Lesepfad unverändert übernommen. Der saubere
-   Weg wäre ein eigenes `resetDetectedCapabilities()`.
+9. ~~**Der Serverwechsel setzt die Fähigkeits-Befunde nicht zurück.**~~
+   *Erledigt.* `resetDetectedCapabilities()` in
+   [state.js](src/background/state.js) schreibt `detected` hart auf `null`,
+   `scopeMissing` auf `false` und `probedAt` auf `0`; `SAVE_CREDENTIALS` in
+   [handlers.js](src/background/handlers.js) ruft es auf, ein Test in
+   [test/handlers.test.js](test/handlers.test.js) nagelt die Verdrahtung fest.
+   **Regel:** `saveDetectedCapabilities` ist kein Reset — `pick()` liest `null`
+   als „keine Aussage" und behält den alten Wert. Wer „vergiss alles" meint,
+   braucht eine eigene Funktion. **Zweite Regel:** zurückgesetzt werden nur
+   *Befunde*. `mode` ist die Vorgabe des Nutzers aus den Optionen und bleibt
+   stehen — zumal `SAVE_CREDENTIALS` auch feuert, wenn nur der Token neu ist.
 
 ### Befund für das Mutterprojekt (nicht hier zu lösen)
 

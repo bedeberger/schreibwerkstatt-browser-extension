@@ -17,8 +17,15 @@ export function collapseWhitespace(value) {
 }
 
 /**
- * Normalisiert Absatzstruktur von extrahiertem Fliesstext:
- * Zeilen trimmen, maximal eine Leerzeile zwischen Absaetzen.
+ * Normalisiert Absatzstruktur von extrahiertem Fliesstext.
+ *
+ * Regel: eine Absatzgrenze ist **zwei** aufeinanderfolgende Zeilenumbrueche.
+ * Ein einzelner Umbruch ist ein Soft-Wrap (vom Browser-Umbuch, von `<br>`
+ * oder von eingeruecktem HTML-Quelltext) und wird zu einem Leerzeichen.
+ * beliebig viele Umbrueche werden zu hoechstens einer Leerzeile.
+ *
+ * NIE fuer den Wortlaut eines Zitats benutzen — siehe `readSelection`.
+ *
  * @param {unknown} value
  * @returns {string}
  */
@@ -26,10 +33,10 @@ export function tidyParagraphs(value) {
   if (typeof value !== 'string') return '';
   return value
     .replace(/\r\n?/g, '\n')
-    .split('\n')
-    .map((line) => line.replace(/[ \t ]+/g, ' ').trim())
-    .join('\n')
-    .replace(/\n{3,}/g, '\n\n')
+    .split(/\n{2,}/)
+    .map((para) => para.replace(/\s+/g, ' ').trim())
+    .filter(Boolean)
+    .join('\n\n')
     .trim();
 }
 

@@ -66,6 +66,16 @@ describe('extractArticleText', () => {
     extractArticleText(doc);
     assert.equal(doc.body.innerHTML, before);
   });
+
+  it('fasst eingerueckten Fliesstext zu einem Absatz zusammen', async () => {
+    const doc = await loadFixture('indented-prose.html', 'https://example.org/probe');
+    const article = extractArticleText(doc);
+    // Readability liefert den ganzen Artikel als einen Block ohne \n\n-Trennung;
+    // die eigentliche Anforderung: KEIN einzelner Zeilenumbruch im Fliesstext.
+    assert.ok(!article.text.includes('\n'), `Soft-Wraps uebrig in:\n${article.text}`);
+    // Die HTML-Einrueckungen sind zu Leerzeichen geworden, nicht zu Umbruechen.
+    assert.ok(article.text.includes('Block umbrochen werden.'), 'Satzgrenze verloren');
+  });
 });
 
 describe('intentFromHarvest', () => {

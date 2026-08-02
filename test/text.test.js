@@ -156,8 +156,38 @@ describe('Kleinkram', () => {
     assert.equal(collapseWhitespace(null), '');
   });
 
-  it('tidyParagraphs behaelt Absaetze, aber nicht mehr als eine Leerzeile', () => {
-    assert.equal(tidyParagraphs('a\n\n\n\nb\n  c  '), 'a\n\nb\nc');
+  it('macht aus einzelnen Umbruechen Leerzeichen, aus doppelten Absaetze', () => {
+    // Soft-Wrap (Browser-Umbuch, <br>, eingerueckter Quelltext) -> Leerzeichen.
+    assert.equal(tidyParagraphs('eins\nzwei'), 'eins zwei');
+    // echter Absatz bleibt.
+    assert.equal(tidyParagraphs('eins\n\nzwei'), 'eins\n\nzwei');
+    // mehr als eine Leerzeile -> genau eine.
+    assert.equal(tidyParagraphs('eins\n\n\n\nzwei'), 'eins\n\nzwei');
+  });
+
+  it('fasst zusammenhaengenden Fliesstext aus mehreren Quellzeilen zusammen', () => {
+    // So sieht echtes HTML aus: ein Logik-Absatz, ueber mehrere Zeilen eingrueckt.
+    assert.equal(
+      tidyParagraphs('  Die Versammlung wurde\n  um 19:30 Uhr\n  durch den Gemeindepräsidenten eröffnet.  '),
+      'Die Versammlung wurde um 19:30 Uhr durch den Gemeindepräsidenten eröffnet.',
+    );
+  });
+
+  it('behält mehrere Absaetze und glaettet jeden einzelnen', () => {
+    assert.equal(
+      tidyParagraphs('a\n\n\n\nb\n  c  '),
+      'a\n\nb c',
+    );
+  });
+
+  it('normalisiert CRLF und Soft-Wraps zusammen', () => {
+    assert.equal(tidyParagraphs('eins\r\nzwei\r\n\r\n drei'), 'eins zwei\n\ndrei');
+  });
+
+  it('leerer/falscher Input ergibt Leerstring', () => {
+    assert.equal(tidyParagraphs(''), '');
+    assert.equal(tidyParagraphs(null), '');
+    assert.equal(tidyParagraphs('   \n  \n  '), '');
   });
 
   it('clampLine kuerzt hart auf die Titellaenge', () => {

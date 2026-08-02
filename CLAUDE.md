@@ -198,16 +198,20 @@ halten soll — nicht als Aufgabenliste.
    stille Kürzen der Textfelder. [tools/review-server.mjs](tools/review-server.mjs)
    zieht daraus. **Regel:** Die Attrappe ist der Vertrag, gegen den geprüft wird —
    wer sie mit dem Client zusammen falsch macht, macht die Tests wertlos.
-8. **`normalizeUrl` ist nicht die Normalisierung des Servers.** Beim Bau des
-   Lesepfads aufgefallen: [url.js](src/shared/url.js) behält `www.`, das Schema
-   und `#!`-Routen und entfernt den Trailing-Slash nur beim leeren Pfad;
-   `lib/url-normalize.js` tut jeweils das Gegenteil. Außerdem streicht der
-   Client Parameter, die der Server stehen lässt (`ref_src`, `ref_url`, `trk`,
-   `spm`, Präfixe `mtm_`, `ga_`, `_hs`). Für die Dublettenprüfung ist das über
-   `serverNormalizeUrl` gelöst; **ungelöst** bleibt es dort, wo die Erweiterung
-   lokal vergleicht (Warteschlangen-Dubletten, Doppelklick-Schutz) — dort hält
-   sie zwei Adressen auseinander, die der Server verschmilzt. Die Zeile
-   „Geprüft und stimmig: … URL-Normalisierung" von zuvor war falsch.
+8. ~~**`normalizeUrl` ist nicht die Normalisierung des Servers.**~~ *Erledigt.*
+   Die beiden Funktionen bleiben verschieden — das ist Absicht: `normalizeUrl`
+   ist die Form, die **gesendet** wird, `serverNormalizeUrl` die Form, in der
+   **verglichen** wird. **Regel:** jeder Vergleich zweier Adressen läuft über
+   `serverNormalizeUrl` bzw. `sameServerResource`, auch ein rein lokaler. Nach
+   Client-Regeln zu vergleichen behauptet Unterschiede, die der Server nicht
+   sieht. Umgestellt sind die kanonische Adresse gegen die Seiten-URL
+   ([intent.js](src/shared/intent.js)) und die Entdopplung von `urls[]` vor dem
+   Senden (`buildResearchPayload` in
+   [capture-runner.js](src/background/capture-runner.js)); `sameResource` ist
+   ersatzlos entfernt, weil es genau diese Falle war. „Warteschlangen-Dubletten"
+   und „Doppelklick-Schutz" standen hier zu Unrecht: beides entscheidet der
+   Server (`GET /sources/by-url`, Idempotenzfenster), der Client vergleicht dort
+   nichts.
 9. **Der Serverwechsel setzt die Fähigkeits-Befunde nicht zurück.**
    `saveDetectedCapabilities({ capture: null, … })` in
    [service-worker.js](src/background/service-worker.js) meint „zurücksetzen",

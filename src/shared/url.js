@@ -1,14 +1,20 @@
 /**
  * URL-Normalisierung.
  *
- * Zweck: eine stabile, vergleichbare Form derselben Seite, damit
- *  - `GET /sources/by-url` verlaesslich trifft,
- *  - der Doppelklick-Schutz nicht an `?utm_source=` scheitert,
- *  - die Retry-Queue Duplikate erkennt.
+ * Es gibt hier zwei Normalisierer, und die Trennung ist der Punkt:
  *
- * Bewusst konservativ: wir entfernen nur, was nachweislich Tracking ist.
- * Alles andere bleibt stehen, weil es die Ressource identifizieren koennte
- * (`?id=42`, `?page=3`, `?v=…`).
+ *  - `normalizeUrl` ist die Form, die wir SENDEN. Sie legt fest, unter welcher
+ *    Adresse ein Fundstueck in der Bibliothek landet, und ist deshalb bewusst
+ *    konservativ: entfernt wird nur, was nachweislich Tracking ist. Alles
+ *    andere bleibt stehen, weil es die Ressource identifizieren koennte
+ *    (`?id=42`, `?page=3`, `?v=…`).
+ *  - `serverNormalizeUrl` ist der Nachbau von `lib/url-normalize.js` und
+ *    beantwortet die andere Frage: „sieht der SERVER hier dieselbe Seite?"
+ *
+ * **Jeder Vergleich zweier Adressen gehoert zum zweiten**, auch der rein
+ * lokale. Vergleicht der Client mit seinen eigenen, strengeren Regeln, haelt
+ * er `http://www.x.de/a/` und `https://x.de/a` auseinander — der Server nicht,
+ * und heraus kommt eine Dublette, die es serverseitig gar nicht geben kann.
  */
 
 /** Exakte Parameternamen, die entfernt werden. */
@@ -124,34 +130,26 @@ export function normalizeUrl(raw) {
   return out;
 }
 
-/**
- * Vergleicht zwei URLs nach Normalisierung.
- * @param {unknown} a
- * @param {unknown} b
- */
-export function sameResource(a, b) {
-  const na = normalizeUrl(a);
-  const nb = normalizeUrl(b);
-  return !!na && na === nb;
-}
-
 // ---------------------------------------------------------------------------
 // Serverseitige Normalisierung, hier nachgebaut
 // ---------------------------------------------------------------------------
 
 /**
- * Warum es zwei Normalisierer gibt:
+ * Zeichengenauer Nachbau von `lib/url-normalize.js` im Mutterprojekt.
  *
- * `normalizeUrl` oben ist die Form, die wir SENDEN und lokal vergleichen
- * (Queue-Dubletten, Doppelklick-Schutz). Sie ist bewusst konservativer als der
- * Server: sie behaelt `www.`, das Schema und `#!`-Routen.
+ * Gebraucht wird er ueberall, wo zwei Adressen VERGLICHEN werden, und zwar
+ * unabhaengig davon, woher sie kommen:
  *
- * `serverNormalizeUrl` ist dagegen ein zeichengenauer Nachbau von
- * `lib/url-normalize.js` im Mutterprojekt. Er wird nur dort gebraucht, wo der
- * Client eine Server-Antwort mit einer eigenen URL VERGLEICHT — heute die
- * Dublettenpruefung gegen `urls[].url` aus `GET /research`. Wuerden wir dafuer
- * die obere Funktion nehmen, hielte der Client `https://x.de/a/` und
- * `http://www.x.de/a` fuer verschiedene Seiten, der Server aber fuer dieselbe.
+ *  - Dublettenpruefung gegen `urls[].url` aus `GET /research`
+ *    (`shared/duplicates.js`),
+ *  - kanonische Adresse gegen Seiten-URL (`shared/intent.js`),
+ *  - Dubletten innerhalb von `urls[]` vor dem Senden
+ *    (`buildResearchPayload` in `background/capture-runner.js`).
+ *
+ * Es gibt bewusst kein Gegenstueck auf Basis von `normalizeUrl`: ein solcher
+ * Vergleich waere strenger als der Server und wuerde Unterschiede behaupten,
+ * die drueben keine sind. Die frueher hier stehende Funktion `sameResource`
+ * hat genau das getan und wurde deshalb entfernt.
  *
  * Aenderungen hier gehoeren mit `lib/url-normalize.js` abgeglichen; ein Test
  * in `test/url.test.js` haelt die dokumentierten Faelle fest.

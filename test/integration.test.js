@@ -10,7 +10,13 @@ import { after, before, describe, it } from 'node:test';
 
 import { clientVersion, createApiClient, describeDevice } from '../src/background/api-client.js';
 import { probeCapabilities, probeResearchList } from '../src/background/capabilities.js';
-import { buildSourcePayload, runCaptureJob, toBase64, toBinary } from '../src/background/capture-runner.js';
+import {
+  buildResearchPayload,
+  buildSourcePayload,
+  runCaptureJob,
+  toBase64,
+  toBinary,
+} from '../src/background/capture-runner.js';
 import { createQueue } from '../src/background/queue.js';
 import { startMockServer } from './helpers/mock-server.js';
 import { JOB_STATE } from '../src/shared/config.js';
@@ -586,6 +592,31 @@ describe('Erfassung: /capture-Pfad', () => {
     } finally {
       await server.close();
     }
+  });
+
+  /**
+   * `urls[]` wird nach SERVER-Regeln entdoppelt, gesendet wird der Wortlaut.
+   * Vorher war der Schluessel die getrimmte Zeichenkette — damit gingen zwei
+   * Verweise raus, die der Server als eine Adresse liest.
+   */
+  it('entdoppelt urls[] so, wie der Server sie zusammenlegt', () => {
+    const intent = baseIntent({ mode: 'research' });
+    intent.urls = [
+      { url: 'https://example.org/a/b/', label: 'canonical' },
+      { url: 'http://www.example.org/a/b?utm_source=rss', label: 'spiegel' },
+      { url: 'https://example.org/a/b.pdf', label: 'PDF' },
+      { url: 'nicht-parsbar', label: 'kaputt' },
+      { url: 'nicht-parsbar', label: 'kaputt' },
+    ];
+
+    const { payload } = buildResearchPayload(intent);
+
+    assert.deepEqual(payload.urls, [
+      // Der Wortlaut, nicht die normalisierte Form.
+      { url: 'https://example.org/a/b/', label: 'canonical' },
+      { url: 'https://example.org/a/b.pdf', label: 'PDF' },
+      { url: 'nicht-parsbar', label: 'kaputt' },
+    ]);
   });
 
   it('liest die Antwortflags: neu angelegt', async () => {

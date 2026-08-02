@@ -22,6 +22,7 @@ import {
   validateResearchPayload,
   validateSourcePayload,
 } from '../shared/limits.js';
+import { serverNormalizeUrl } from '../shared/url.js';
 
 /**
  * @typedef {object} RunContext
@@ -281,10 +282,15 @@ export function buildResearchPayload(intent) {
   const seen = new Set();
   for (const entry of intent.urls || []) {
     if (!entry || !hasText(entry.url)) continue;
-    const key = entry.url.trim();
+    const value = entry.url.trim();
+    // Verglichen wird nach SERVER-Regeln, gesendet wird der Wortlaut. Zwei
+    // Adressen, die der Server verschmilzt, duerfen hier nicht als zwei
+    // Verweise landen. Was er nicht parsen kann, bleibt mit sich selbst
+    // verglichen — lieber ein Verweis zu viel als einer verschluckt.
+    const key = serverNormalizeUrl(value) || value;
     if (seen.has(key)) continue;
     seen.add(key);
-    urls.push({ url: key, label: entry.label || '' });
+    urls.push({ url: value, label: entry.label || '' });
   }
 
   return clampResearchPayload(

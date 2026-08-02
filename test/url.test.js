@@ -10,7 +10,6 @@ import {
   normalizeUrl,
   resolveUrl,
   sameOrigin,
-  sameResource,
   sameServerResource,
   serverNormalizeUrl,
   toOriginPattern,
@@ -71,23 +70,6 @@ describe('normalizeUrl', () => {
     assert.equal(normalizeUrl('kein-url'), null);
     assert.equal(normalizeUrl(''), null);
     assert.equal(normalizeUrl(null), null);
-  });
-});
-
-describe('sameResource', () => {
-  it('erkennt dieselbe Seite trotz Tracking und Fragment', () => {
-    assert.equal(
-      sameResource('https://example.org/a?utm_source=x#top', 'https://EXAMPLE.org/a'),
-      true,
-    );
-  });
-
-  it('unterscheidet verschiedene Seiten', () => {
-    assert.equal(sameResource('https://example.org/a', 'https://example.org/b'), false);
-  });
-
-  it('unbrauchbare Eingaben sind nie gleich', () => {
-    assert.equal(sameResource('nichts', 'nichts'), false);
   });
 });
 
@@ -218,9 +200,12 @@ describe('serverNormalizeUrl — Nachbau der Serverregeln', () => {
       sameServerResource('http://www.example.org/a/b/?utm_source=n#x', 'https://example.org/a/b'),
       true,
     );
-    // sameResource sieht hier vier verschiedene Seiten — deshalb darf die
-    // Dublettenpruefung nicht damit arbeiten.
-    assert.equal(sameResource('http://www.example.org/a/b/', 'https://example.org/a/b'), false);
+    // Mit den Client-Regeln waeren das zwei verschiedene Seiten — deshalb
+    // laeuft KEIN Vergleich ueber `normalizeUrl`, auch kein rein lokaler.
+    assert.notEqual(
+      normalizeUrl('http://www.example.org/a/b/'),
+      normalizeUrl('https://example.org/a/b'),
+    );
     assert.equal(sameServerResource('https://example.org/a', 'https://example.org/b'), false);
     assert.equal(sameServerResource('kaputt', 'kaputt'), false);
   });

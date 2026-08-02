@@ -8,7 +8,7 @@
 
 import { CAPTURE_MODES, LIMITS, RESEARCH_KINDS } from './limits.js';
 import { clampLine, isoDate, truncateAtSentence } from './text.js';
-import { normalizeUrl } from './url.js';
+import { normalizeUrl, sameServerResource } from './url.js';
 
 /**
  * @param {any} harvested Rueckgabe von `content/harvest.js`
@@ -45,7 +45,11 @@ export function intentFromHarvest(harvested, options = {}) {
 
   /** @type {Array<{url: string, label: string}>} */
   const urls = [];
-  if (meta.canonicalUrl && normalizeUrl(meta.canonicalUrl) !== normalizedUrl) {
+  // Nach SERVER-Regeln vergleichen: eine kanonische Adresse, die sich nur in
+  // `www.`, Schema oder Trailing-Slash unterscheidet, ist fuer den Server
+  // dieselbe Seite. Mit den Client-Regeln haetten wir sie als zweiten
+  // `urls[]`-Eintrag angehaengt — eine Dublette, die der Server nie erzeugt.
+  if (meta.canonicalUrl && !sameServerResource(meta.canonicalUrl, normalizedUrl)) {
     urls.push({ url: meta.canonicalUrl, label: 'canonical' });
   }
   if (meta.pdfUrl) urls.push({ url: meta.pdfUrl, label: 'PDF' });

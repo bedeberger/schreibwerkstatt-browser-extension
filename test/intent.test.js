@@ -144,6 +144,36 @@ describe('intentFromHarvest', () => {
     assert.equal(intent.url, url);
   });
 
+  /**
+   * Der Vergleich „kanonische Adresse == Seiten-URL?" laeuft nach SERVER-Regeln.
+   * Mit den strengeren Client-Regeln waeren `www.`, Schema und Trailing-Slash
+   * ein Unterschied — und die Erweiterung haengte einen zweiten `urls[]`-Eintrag
+   * an, den der Server ohnehin als dieselbe Seite liest.
+   */
+  it('haengt eine nur nach Client-Regeln abweichende kanonische URL nicht an', () => {
+    const intent = intentFromHarvest({
+      meta: {
+        url: 'https://kestrel.example.net/posts/standing-desk',
+        normalizedUrl: 'https://kestrel.example.net/posts/standing-desk',
+        canonicalUrl: 'http://www.kestrel.example.net/posts/standing-desk/',
+      },
+    }, {});
+    assert.deepEqual(intent.urls, []);
+  });
+
+  it('haengt eine wirklich andere kanonische URL sehr wohl an', () => {
+    const intent = intentFromHarvest({
+      meta: {
+        url: 'https://kestrel.example.net/p/17',
+        normalizedUrl: 'https://kestrel.example.net/p/17',
+        canonicalUrl: 'https://kestrel.example.net/posts/standing-desk',
+      },
+    }, {});
+    assert.deepEqual(intent.urls, [
+      { url: 'https://kestrel.example.net/posts/standing-desk', label: 'canonical' },
+    ]);
+  });
+
   it('faellt bei unbekanntem Modus auf `research` zurueck', async () => {
     const doc = await loadFixture('bare.html', 'https://example.org/x');
     const intent = intentFromHarvest(harvestLike(doc, 'https://example.org/x'), { mode: 'quatsch' });

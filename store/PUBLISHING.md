@@ -28,6 +28,7 @@ Beide betreffen genau diese Erweiterung und nicht Erweiterungen im Allgemeinen.
 - [6. Einreichen](#6-einreichen)
 - [7. Die Prüfung](#7-die-prüfung)
 - [8. Aktualisieren](#8-aktualisieren)
+  - [Automatisch aktualisieren](#automatisch-aktualisieren)
 - [Checkliste](#checkliste)
 
 ---
@@ -194,9 +195,14 @@ Claude-Code-Befehl **`/release`**
 ([.claude/commands/release.md](../.claude/commands/release.md)): er prüft den
 Arbeitsbaum, erhöht auf Wunsch die Version, lässt `npm test` und
 `npm run package` laufen, taggt, pusht und hängt das ZIP an ein GitHub-Release.
-Den **Store-Upload nimmt er nicht vor** — der bleibt Handarbeit, siehe
-[Aktualisieren](#8-aktualisieren). Nötig ist der Befehl nicht; er ersetzt nur
-das Von-Hand-Tippen dieser Schritte.
+Den Store-Upload nimmt er **nur mit `--store`** vor — ohne diesen Schalter endet
+er am GitHub-Release, siehe [Automatisch aktualisieren](#automatisch-aktualisieren).
+Nötig ist der Befehl nicht; er ersetzt nur das Von-Hand-Tippen dieser Schritte.
+
+Die **erste** Einreichung geht nicht über die API: `POST …/items` kennt sie
+nicht, und Eintragstexte, Screenshots, Datenschutzangaben und Sichtbarkeit füllt
+ohnehin nur das Dashboard. Automatisieren lässt sich die *Aktualisierung* eines
+Eintrags, der schon existiert.
 
 Der Code ist bewusst nicht minifiziert. Minifizieren wäre erlaubt, macht die
 Prüfung aber langsamer; Obfuskieren ist verboten. So bleibt es, wie es ist.
@@ -475,6 +481,90 @@ Dann im Dashboard **Paket** → **Neues Paket hochladen** → einreichen.
 
 Ändert sich der Umfang der übertragenen Daten, gehören Datenschutzerklärung und
 Datennutzungs-Angaben im selben Zug angepasst.
+
+### Automatisch aktualisieren
+
+Hochladen und Einreichen nimmt die **Chrome Web Store API** ab. Zwei Werkzeuge:
+
+```bash
+npm run store:auth                        # einmalig: Refresh-Token holen
+npm run store:publish -- --dry-run        # prüfen, ohne etwas zu senden
+npm run store:publish                     # hochladen und einreichen
+```
+
+Weitere Schalter von `store:publish`: `--upload-only` (Entwurf stehen lassen),
+`--publish-only` (den vorhandenen Entwurf einreichen), `--target=trustedTesters`,
+`--version=x.y.z`, `--zip=<pfad>`. Ohne Angabe nimmt es die Version aus
+`package.json` und das dazu passende ZIP aus `store/`.
+
+Denselben Aufruf hängt **`/release --store`** hinter das GitHub-Release. Ohne
+`--store` geht nichts an den Store — der Schalter ist Absicht: `/release` läuft
+ohne Rückfrage durch, und eine Einreichung ist nach außen wirksam und nicht
+zurücknehmbar.
+
+#### Einrichtung bei Google (einmalig)
+
+1. **Item-ID** aus der Dashboard-URL des Eintrags notieren (32 Kleinbuchstaben).
+2. Ein **Google-Cloud-Projekt** unter demselben Konto anlegen und darin die
+   **Chrome Web Store API** aktivieren.
+3. **OAuth-Zustimmungsbildschirm** einrichten, Nutzertyp „Extern", Scope
+   `https://www.googleapis.com/auth/chromewebstore`.
+4. **OAuth-Client-ID** vom Typ **„Desktop-App"** erzeugen → `client_id` und
+   `client_secret`. Der Typ ist nicht beliebig: nur er darf auf
+   `http://localhost` mit beliebigem Port zurückleiten, und genau das braucht
+   `npm run store:auth`.
+5. Die drei Werte nach `~/.config/schreibwerkstatt-cws.json` schreiben:
+
+   ```json
+   {
+     "item_id": "…",
+     "client_id": "….apps.googleusercontent.com",
+     "client_secret": "…"
+   }
+   ```
+
+6. `npm run store:auth` — öffnet den Zustimmungsbildschirm, fängt den Code auf
+   einer Loopback-Adresse auf und ergänzt das `refresh_token` in derselben
+   Datei. Der Warnhinweis „Google hat diese App nicht verifiziert" ist erwartbar;
+   es ist die eigene App, weiter über „Erweitert".
+
+> **Zum Status „Testing".** Dort verfallen Refresh-Token nach **sieben Tagen** —
+> der nächste Release scheitert dann mit `invalid_grant`. Auf „In Produktion"
+> gestellt, hält das Token dauerhaft; eine Google-Verifizierung braucht dieser
+> Scope nicht, der Warnhinweis beim eigenen Login bleibt und ist folgenlos.
+>
+> Geht das Umstellen nicht, ist das **kein Blocker**: `npm run store:auth` ist
+> ein Browser-Klick und lässt sich vor jedem Release wiederholen. Damit das nicht
+> erst nach dem Push auffällt, prüft `/release --store` das Token schon in
+> Schritt 4, direkt nach dem Packen.
+
+#### Wo die Zugangsdaten liegen — und wo nicht
+
+**Nicht im Repository.** Es ist öffentlich, und `/release` committet mit
+`git add -A` alles, was es findet; eine `.gitignore`-Zeile ist dagegen keine
+Sicherung, sondern eine Bitte. Vorgabe ist deshalb
+`~/.config/schreibwerkstatt-cws.json` mit Rechten 600 — die Werkzeuge setzen sie
+selbst und **brechen ab**, wenn die Datei im Arbeitsbaum liegt.
+
+Ein anderer Pfad geht mit `CWS_CONFIG`, einzelne Werte mit `CWS_ITEM_ID`,
+`CWS_CLIENT_ID`, `CWS_CLIENT_SECRET`, `CWS_REFRESH_TOKEN` — die Umgebung gewinnt
+über die Datei. Das Access-Token wird bei jedem Aufruf frisch geholt und nirgends
+gespeichert.
+
+#### Was die API nicht abnimmt
+
+- **Sie veröffentlicht nicht.** Sie reicht ein; alles danach entscheidet die
+  Prüfung. Die Regel [Nicht erneut einreichen, solange die Prüfung
+  läuft](#7-die-prüfung) gilt unverändert — kommt `ITEM_PENDING_REVIEW`, bricht
+  `store:publish` ab, statt es nochmal zu versuchen.
+- **Eintragstexte, Screenshots, Datenschutzangaben und Sichtbarkeit** bleiben
+  Dashboard-Arbeit.
+- **Dieselbe Versionsnummer nimmt der Store nicht zweimal.** `store:publish`
+  vergleicht vorher mit dem Entwurf im Store und bricht früh ab, statt den
+  Upload-Fehler abzuwarten.
+- **Neue Berechtigungen** deaktivieren die Erweiterung bei allen Nutzern, bis sie
+  zustimmen — daran ändert der automatische Weg nichts, er macht es nur leichter
+  zu übersehen. Vor `--store` also einmal auf das Manifest schauen.
 
 ---
 

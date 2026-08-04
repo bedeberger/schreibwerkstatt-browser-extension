@@ -1,6 +1,6 @@
 ---
 description: Arbeitsstand committen, Version setzen, testen, packen, Tag und GitHub-Release mit ZIP-Anhang
-argument-hint: "[patch|minor|major|x.y.z] [--draft] [--dry-run]"
+argument-hint: "[patch|minor|major|x.y.z] [--store] [--draft] [--dry-run]"
 allowed-tools: Bash(git *), Bash(gh *), Bash(npm *), Bash(node *), Bash(sha256sum *), Read, Write, Edit
 ---
 
@@ -8,8 +8,10 @@ allowed-tools: Bash(git *), Bash(gh *), Bash(npm *), Bash(node *), Bash(sha256su
 
 Erzeugt aus dem aktuellen Stand ein GitHub-Release: getestet, gepackt,
 committet, gepusht, getaggt, mit dem Store-ZIP als Anhang. **Der Upload in den
-Chrome Web Store gehört nicht dazu** — der bleibt Handarbeit, siehe
-[store/PUBLISHING.md](../../store/PUBLISHING.md), Abschnitt „Aktualisieren".
+Chrome Web Store geschieht nur mit `--store`** (Schritt 8); ohne den Schalter
+endet der Ablauf am GitHub-Release. Einrichtung und Grenzen:
+[store/PUBLISHING.md](../../store/PUBLISHING.md), Abschnitt
+„Automatisch aktualisieren".
 
 „Aus dem aktuellen Stand" heißt wörtlich: der Arbeitsstand wird nicht
 vorausgesetzt, sondern mitgenommen. Was im Arbeitsverzeichnis liegt, ist nach
@@ -21,10 +23,14 @@ Argumente: `$ARGUMENTS`
 
 - `patch` · `minor` · `major` · `x.y.z` — Version vorher erhöhen. Ohne Angabe
   wird die Version aus `package.json` genommen, wie sie ist.
+- `--store` — nach dem GitHub-Release das Paket in den Chrome Web Store laden
+  **und zur Prüfung einreichen** (Schritt 8). Ohne den Schalter geht nichts an
+  den Store.
 - `--draft` — Release als Entwurf anlegen (Tag wird trotzdem gepusht).
 - `--dry-run` — alles prüfen, testen, packen und die Notizen zeigen, aber weder
   committen noch pushen noch ein Release anlegen. **Der einzige Weg, den Ablauf
-  ohne Nebenwirkung zu sehen.**
+  ohne Nebenwirkung zu sehen.** Mit `--store` kombiniert wird auch dort nichts
+  gesendet, sondern nur `npm run store:publish -- --dry-run` geprüft.
 
 ## Regeln für diesen Ablauf
 
@@ -121,7 +127,7 @@ Beides muss leer sein.
 npm test
 ```
 
-224 Tests, kein Netz nötig. Ein einziger Fehlschlag beendet den Release —
+382 Tests, kein Netz nötig. Ein einziger Fehlschlag beendet den Release —
 Ausgabe zeigen, nichts umdeuten.
 
 ## 4. Paket bauen
@@ -140,6 +146,18 @@ die leere Arbeitskopie, dass das ZIP dem getaggten Commit entspricht; jetzt
 garantiert das nur noch die Reihenfolge. Jede Änderung dazwischen — auch eine
 „kleine Korrektur" — macht das Release-ZIP zu einem anderen Stand als den Tag.
 Wer nach dem Packen noch etwas ändern muss, bricht ab und startet `/release` neu.
+
+**Mit `--store` hier gleich die Zugangsdaten prüfen**, noch vor Commit und Push:
+
+```bash
+npm run store:publish -- --dry-run --version=<version>
+```
+
+Der Aufruf sendet nichts, holt aber ein Access-Token und liest den Zustand des
+Eintrags — also fällt ein verfallenes Refresh-Token (`invalid_grant`, siehe
+Schritt 8) **hier** auf, wo Abbrechen noch folgenlos ist, und nicht nach dem
+Push. Scheitert es: abbrechen, den Grund nennen, den Versions-Bump zurücknehmen.
+Wer trotzdem ohne Store releasen will, startet `/release` ohne `--store` neu.
 
 `dist/` bleibt danach im Arbeitsverzeichnis liegen und ist genau der Stand, der
 im ZIP steckt. Für die eigene Nutzung also **kein Entpacken nötig**: in
@@ -195,13 +213,21 @@ und die Datenschutzerklärung im selben Zug nachzuziehen sind.
 ## 6. Zusammenfassung
 
 Zeigen, **nicht fragen**: Version, ob gebumpt, Testergebnis, ZIP-Name mit
-SHA-256, Zieltag, `--draft` ja/nein, die Liste der Dateien, die mit in den
-Commit gehen, und die fertigen Notizen. Danach ohne Rückfrage weiter zu
-Schritt 7.
+SHA-256, Zieltag, `--draft` ja/nein, `--store` ja/nein, die Liste der Dateien,
+die mit in den Commit gehen, und die fertigen Notizen. Danach ohne Rückfrage
+weiter zu Schritt 7.
 
 Bei `--dry-run` hier enden — mit dem Hinweis, dass ZIP und Notizen erzeugt
 wurden, aber weder Commit noch Tag noch Release existieren und der
-Arbeitsstand unverändert liegt.
+Arbeitsstand unverändert liegt. War `--store` dabei, vorher noch
+
+```bash
+npm run store:publish -- --dry-run --version=<version>
+```
+
+laufen lassen: das prüft Zugangsdaten, Paket und den Zustand des Eintrags im
+Store, ohne etwas zu senden. Scheitert es, sagen woran — der Release selbst
+bleibt davon unberührt.
 
 ## 7. Veröffentlichen
 
@@ -243,15 +269,53 @@ Zwei Sonderfälle:
   das sagen und den Befehl zum Nachholen ausgeben. Weder Tag löschen noch den
   Push zurückdrehen.
 
-## 8. Abschluss
+## 8. Store-Upload — nur mit `--store`
+
+Ohne den Schalter diesen Schritt überspringen und in Schritt 9 sagen, dass der
+Store-Upload offen ist.
+
+Erst hier, **nach** dem GitHub-Release: was im Store landet, ist dann schon
+getaggt und öffentlich nachvollziehbar. Scheitert dieser Schritt, ist der
+Release trotzdem gültig — nachholen lässt er sich jederzeit.
+
+```bash
+npm run store:publish -- --version=<version>
+```
+
+Das Werkzeug lädt das ZIP aus `store/` hoch und reicht es zur Prüfung ein.
+Zugangsdaten liegen außerhalb des Repositories
+([store/PUBLISHING.md](../../store/PUBLISHING.md), Abschnitt
+„Automatisch aktualisieren"); fehlen sie, bricht es mit einer Liste dessen ab,
+was fehlt.
+
+Nichts davon umdeuten und nichts wiederholen:
+
+- **`ITEM_PENDING_REVIEW`** — eine Prüfung läuft. Das Paket liegt hochgeladen im
+  Entwurf, eingereicht ist es nicht. Melden und stehen lassen; eine zweite
+  Einreichung setzt die Uhr auf null und kann das Konto markieren. Nachholen
+  später mit `npm run store:publish -- --publish-only`.
+- **`invalid_grant`** — das Refresh-Token ist verfallen, fast immer weil der
+  OAuth-Zustimmungsbildschirm noch auf „Testing" steht. `npm run store:auth`
+  nennen, nicht selbst versuchen.
+- **Version schon im Entwurf** — dieser Stand ist bereits eingereicht. Melden,
+  nicht mit einem anderen ZIP übergehen.
+
+Die Ausgabe des Werkzeugs vollständig zeigen; das SHA-256 daraus muss mit dem aus
+Schritt 4 übereinstimmen.
+
+## 9. Abschluss
 
 Melden: Release-URL, Tag, SHA-256 des ZIP und **welche Dateien der Commit
 mitgenommen hat** (die Liste aus Schritt 7, nicht bloß „alles"). Dazu, dass
 `dist/` auf diesem Stand gebaut ist und in `chrome://extensions` nur noch neu
 geladen werden muss. Danach der Hinweis, was noch offen ist:
 
-- Store-Upload von Hand: Developer Dashboard → **Paket** → **Neues Paket
-  hochladen**, Ablauf und Fallstricke in
+- Mit `--store`: die Version ist **eingereicht**, nicht veröffentlicht — wann sie
+  erscheint, entscheidet die Prüfung. Stand im Developer Dashboard.
+- Ohne `--store`: Upload von Hand, Developer Dashboard → **Paket** → **Neues
+  Paket hochladen**, Ablauf und Fallstricke in
   [store/PUBLISHING.md](../../store/PUBLISHING.md).
 - Solange eine Store-Prüfung läuft, nicht erneut einreichen.
 - SHA-256 notieren, damit später belegbar ist, welcher Stand hochgegangen ist.
+- Sind **neue Berechtigungen** dazugekommen, hier ausdrücklich sagen: Chrome
+  deaktiviert die Erweiterung dann bei allen Nutzern, bis sie zustimmen.

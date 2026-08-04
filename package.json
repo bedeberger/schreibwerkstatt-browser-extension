@@ -17,7 +17,9 @@
     "test": "node --test \"test/**/*.test.js\"",
     "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
     "review-server": "node tools/review-server.mjs",
-    "shots": "node build.mjs && node tools/make-shots.mjs"
+    "shots": "node build.mjs && node tools/make-shots.mjs",
+    "store:auth": "node tools/store-auth.mjs",
+    "store:publish": "node tools/store-publish.mjs"
   },
   "dependencies": {
     "@mozilla/readability": "^0.6.0"

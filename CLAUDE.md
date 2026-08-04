@@ -16,6 +16,8 @@ npm run package   # store-fertiges ZIP unter store/ (baut vorher)
 npm run promo     # Werbekacheln für den Store
 npm run shots     # Store-Screenshots (braucht SHOTS_TOKEN, siehe store/PUBLISHING.md)
 npm run review-server  # Referenz-Server für die Store-Prüfung (REVIEW_TOKEN setzen)
+npm run store:auth     # einmalig: Refresh-Token für die Chrome-Web-Store-API
+npm run store:publish  # Paket hochladen und einreichen (--dry-run prüft nur)
 npm run clean     # dist/ löschen
 ```
 
@@ -32,8 +34,11 @@ GitHub-Release mit dem ZIP als Anhang. Das geschieht ohne Rückfrage — wer den
 Ablauf folgenlos sehen will, nimmt `--dry-run`. Weil `git add -A` nicht nach
 Herkunft fragt, ist die Sichtprüfung des Arbeitsstands in Schritt 1 die einzige
 Bremse vor einem öffentlichen Push; die Liste, was dort nie hineingehört, steht
-unten unter *Öffentliches Repository*. Der Upload in den Chrome Web Store bleibt
-Handarbeit — [store/PUBLISHING.md](store/PUBLISHING.md).
+unten unter *Öffentliches Repository*. Der Upload in den Chrome Web Store
+geschieht nur mit `--store` und reicht dort zur **Prüfung ein**, veröffentlicht
+also nicht; die Zugangsdaten dafür liegen außerhalb dieses Repositories
+([store/PUBLISHING.md](store/PUBLISHING.md), Abschnitt
+*Automatisch aktualisieren*).
 
 ---
 

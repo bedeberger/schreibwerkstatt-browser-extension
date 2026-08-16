@@ -68,10 +68,11 @@ async function collectUsedKeys() {
     // Validierungsschluessel aus limits.js: key: 'validation_…'
     for (const match of source.matchAll(/\bkey:\s*'(validation_[A-Za-z0-9_]+)'/g)) note(match[1], where);
     // Schluessel, die erst zur Laufzeit an t() gehen (z. B. per Ternaer
-    // gewaehlt). Die Praefixe sind eindeutige Nachrichten-Namensraeume.
+    // gewaehlt oder als `key`-Feld weitergereicht, siehe `shared/outcome.js`).
+    // Die Praefixe sind eindeutige Nachrichten-Namensraeume.
     if (ext === '.js') {
       for (const match of source.matchAll(
-        /(['"])((?:notify|popup|options|badge|provenance|queue_state)_[A-Za-z0-9_]+)\1/g,
+        /(['"])((?:notice|notify|popup|options|badge|provenance|queue_state)_[A-Za-z0-9_]+)\1/g,
       )) {
         note(match[2], where);
       }

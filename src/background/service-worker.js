@@ -33,6 +33,7 @@ import { ApiError, describeError, isRouteMissing } from '../shared/errors.js';
 import { summarizeDuplicates } from '../shared/duplicates.js';
 import { intentFromHarvest } from '../shared/intent.js';
 import { LIMITS, RESEARCH_LIST } from '../shared/limits.js';
+import { attachmentsAreLost, incompleteText } from '../shared/outcome.js';
 import { t } from '../ui/chrome-i18n.js';
 
 const QUEUE_ALARM = 'schreibwerkstatt-queue';
@@ -470,10 +471,7 @@ function restoreAttachments(job) {
   const cached = attachmentCache.get(job.id);
   job.intent.attachments = cached || {};
 
-  const declared = job.intent.attachmentsDeclared || {};
-  const stillOutstanding =
-    (declared.screenshot && !job.progress.imageUploaded) || (declared.pdf && !job.progress.pdfUploaded);
-  if (!cached && stillOutstanding) {
+  if (attachmentsAreLost(job.intent.attachmentsDeclared || {}, job.progress, !!cached)) {
     job.progress.attachmentsLost = true;
   }
 }
@@ -537,7 +535,17 @@ async function showUndoNotification(job, delayMs) {
   });
 }
 
-/** @param {import('../shared/config.js').CaptureJob} job */
+/**
+ * Erfolgsmeldung — und zwar die ganze.
+ *
+ * Ein Auftrag, der seinen Anhang beim Neustart des Workers verloren hat oder
+ * dessen Zitierschluessel schon vergeben war, gilt als erfolgreich und
+ * verlaesst die Queue. Mit ihm verschwaende die Notiz, dass etwas fehlt —
+ * hier ist die einzige Stelle, an der der Nutzer sie noch erfaehrt. Deshalb
+ * haengt sie an der Meldung und nicht an der Warteschlange.
+ *
+ * @param {import('../shared/config.js').CaptureJob} job
+ */
 async function notifySuccess(job) {
   const key =
     job.intent.mode === 'source'
@@ -545,9 +553,10 @@ async function notifySuccess(job) {
       : job.intent.mode === 'both'
         ? 'notify_saved_both'
         : 'notify_saved_research';
+  const incomplete = incompleteText(job.progress, t);
   await notify(`done:${job.id}`, {
-    title: t('notify_saved_title'),
-    message: t(key, [job.intent.bookName || '']),
+    title: incomplete ? t('notify_saved_incomplete_title') : t('notify_saved_title'),
+    message: [t(key, [job.intent.bookName || '']), incomplete].filter(Boolean).join(' '),
     contextMessage: job.intent.title.slice(0, 120),
   });
 }

@@ -20,6 +20,7 @@ import {
 } from '../shared/limits.js';
 import { MSG } from '../shared/messages.js';
 import { createBookOption, el, errorText, showNotice, showUiError } from '../shared/notice.js';
+import { incompleteText } from '../shared/outcome.js';
 import { formatPeople, parsePeople } from '../shared/people.js';
 import { hostLabel, normalizeUrl } from '../shared/url.js';
 import { applyI18n, t } from '../ui/chrome-i18n.js';
@@ -277,7 +278,12 @@ function wireEvents() {
   ui.body.addEventListener('input', updateCounters);
   // Auch diese Felder haben serverseitige Grenzen — der Hinweis muss mitgehen.
   ui.tags.addEventListener('input', updateClampHint);
-  ui.sourceUrl.addEventListener('input', updateClampHint);
+  // Die Dublettenpruefung fragt nach GENAU dieser Adresse. Wer sie korrigiert
+  // (AMP-Variante, Tracking-Rest), bekaeme sonst weiter den Befund zur alten.
+  ui.sourceUrl.addEventListener('input', () => {
+    updateClampHint();
+    scheduleDuplicateCheck();
+  });
   ui.kind.addEventListener('change', updateClampHint);
   ui.authors.addEventListener('input', updateAuthorsPreview);
   ui.book.addEventListener('change', () => void checkDuplicate());
@@ -438,6 +444,20 @@ function updateAuthorsPreview() {
  * entsteht der Eintrag, um den es geht. Die erste nur, wenn wirklich eine
  * Quelle angelegt wird.
  */
+/**
+ * Wartezeit, bevor eine getippte Adresse gefragt wird. Jeder Tastendruck
+ * waere ein Request an den Server — und die Antwort auf eine halbe URL.
+ */
+const DUPLICATE_DEBOUNCE_MS = 400;
+
+/** @type {ReturnType<typeof setTimeout>|undefined} */
+let duplicateTimer;
+
+function scheduleDuplicateCheck() {
+  clearTimeout(duplicateTimer);
+  duplicateTimer = setTimeout(() => void checkDuplicate(), DUPLICATE_DEBOUNCE_MS);
+}
+
 async function checkDuplicate() {
   ui.duplicateNotice.hidden = true;
   ui.duplicateIncomplete.hidden = true;
@@ -639,7 +659,10 @@ async function submit() {
 
     if (result.done) {
       showNotice(ui.formSuccess, successText(intent, result.outcome), 'success');
-      setTimeout(() => window.close(), 1400);
+      // Steht ein Vorbehalt in der Quittung, muss er lesbar sein — eine
+      // Meldung, die nach 1,4 s wegfliegt, ist keine Auskunft.
+      const lingering = incompleteText(result.outcome || {}, t) ? 6000 : 1400;
+      setTimeout(() => window.close(), lingering);
       return;
     }
 
@@ -665,6 +688,10 @@ async function submit() {
  * „war schon drin" nicht von „neu angelegt" zu unterscheiden — und genau das
  * ist die Frage, die sich beim zweiten Erfassen derselben Seite stellt.
  *
+ * Dazu kommt, was NICHT mitgegangen ist: ein verlorener Anhang, ein schon
+ * vergebener Zitierschluessel. Beides laesst den Auftrag gelingen und waere
+ * ohne diesen Zusatz aus der Quittung verschwunden.
+ *
  * @param {Record<string, any>} intent
  * @param {Record<string, any>|null} [outcome] `progress` des Auftrags
  */
@@ -673,6 +700,8 @@ function successText(intent, outcome) {
   if (outcome) {
     if (outcome.sourceCreated === false) parts.push(t('popup_saved_source_existed'));
     if (outcome.researchCreated === false) parts.push(t('popup_saved_research_existed'));
+    const incomplete = incompleteText(outcome, t);
+    if (incomplete) parts.push(incomplete);
   }
   return parts.join(' ');
 }

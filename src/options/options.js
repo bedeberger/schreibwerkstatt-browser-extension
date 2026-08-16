@@ -10,6 +10,7 @@ import { CAPABILITY_MODE, TOKEN_PREFIX, TOKEN_STATE } from '../shared/config.js'
 import { describeError } from '../shared/errors.js';
 import { MSG } from '../shared/messages.js';
 import { createBookOption, el, errorText, hideNotice, showNotice } from '../shared/notice.js';
+import { incompleteNotices } from '../shared/outcome.js';
 import { isLocalHost, normalizeServerUrl, toOriginPattern } from '../shared/url.js';
 import { applyI18n, formatRelativeTime, t } from '../ui/chrome-i18n.js';
 import { send } from '../ui/messaging.js';
@@ -416,11 +417,13 @@ function renderQueue() {
       item.append(error);
     }
 
-    if (job.progress && job.progress.attachmentsLost) {
-      const lost = document.createElement('div');
-      lost.className = 'queue__error';
-      lost.textContent = t('options_queue_attachment_lost');
-      item.append(lost);
+    // Vorbehalte aus derselben Quelle wie Quittung und Benachrichtigung —
+    // sonst erfaehrt der Nutzer hier etwas anderes als dort.
+    for (const notice of incompleteNotices(job.progress)) {
+      const line = document.createElement('div');
+      line.className = 'queue__error';
+      line.textContent = t(notice.key, notice.substitutions);
+      item.append(line);
     }
 
     const actions = document.createElement('div');

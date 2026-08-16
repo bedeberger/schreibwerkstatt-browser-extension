@@ -32,6 +32,9 @@
   "notify_saved_title": {
     "message": "Gesichert"
   },
+  "notify_saved_incomplete_title": {
+    "message": "Gesichert, aber nicht vollständig"
+  },
   "notify_saved_research": {
     "message": "Als Recherche-Fundstück in „$1“ abgelegt."
   },
@@ -752,8 +755,11 @@
   "options_queue_discard_confirm": {
     "message": "„$1“ endgültig verwerfen? Der Eintrag geht verloren."
   },
-  "options_queue_attachment_lost": {
-    "message": "„Screenshot bzw. PDF ging beim Neustart des Browsers verloren. Der Eintrag selbst wird gesendet; den Anhang musst du in der Web-App nachreichen."
+  "notice_attachment_lost": {
+    "message": "Screenshot bzw. PDF ging beim Neustart des Browsers verloren — der Anhang fehlt und muss in der Web-App nachgereicht werden."
+  },
+  "notice_citekey_dropped": {
+    "message": "Der Zitierschlüssel „$1“ war schon vergeben — der Server hat einen eigenen gewählt."
   },
   "options_section_privacy": {
     "message": "6. Was verlässt den Browser"

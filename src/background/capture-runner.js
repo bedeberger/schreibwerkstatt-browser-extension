@@ -373,7 +373,16 @@ async function createOrReuseSource(job, ctx) {
     const err = /** @type {any} */ (error);
     if (err.code === 'CITEKEY_TAKEN' && payload.citekey) {
       // Vertragsgemaess: ohne citekey erneut senden, Server vergibt einen.
+      //
+      // Den Schluessel hat der Nutzer selbst eingetippt — dass er nicht
+      // uebernommen wurde, gehoert an den Auftrag und von dort in die
+      // Quittung. Ohne diesen Vermerk meldet die Erweiterung „gespeichert"
+      // ueber eine Quelle, die unter einem anderen Schluessel liegt als dem
+      // gewaehlten. Genau dieser stille Verlust ist auch die Begruendung
+      // dafuer, dass ein Auftrag mit `citekey` ueberhaupt diesen Weg nimmt
+      // (siehe `unifiedCaptureFits`) — dann darf er hier nicht doch passieren.
       log('citekey-taken-retry', { citekey: payload.citekey });
+      progress.citekeyDropped = payload.citekey;
       const { citekey, ...withoutCitekey } = payload;
       source = await api.createSource(withoutCitekey);
     } else {

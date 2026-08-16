@@ -32,6 +32,9 @@
   "notify_saved_title": {
     "message": "Saved"
   },
+  "notify_saved_incomplete_title": {
+    "message": "Saved, but not complete"
+  },
   "notify_saved_research": {
     "message": "Filed as a research find in “$1”."
   },
@@ -752,8 +755,11 @@
   "options_queue_discard_confirm": {
     "message": "Discard “$1” for good? The entry will be lost."
   },
-  "options_queue_attachment_lost": {
-    "message": "The screenshot or PDF was lost when the browser restarted. The entry itself is still sent; attach the file again in the web app."
+  "notice_attachment_lost": {
+    "message": "The screenshot or PDF was lost when the browser restarted — the attachment is missing and has to be added again in the web app."
+  },
+  "notice_citekey_dropped": {
+    "message": "The citation key “$1” was already taken — the server assigned one of its own."
   },
   "options_section_privacy": {
     "message": "6. What leaves the browser"

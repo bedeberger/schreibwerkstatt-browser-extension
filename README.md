@@ -122,8 +122,11 @@ Anhänge werden **nicht** mit in die Warteschlange geschrieben: ein 25-MB-PDF w�
 als base64 rund 33 MB, `chrome.storage.local` fasst aber nur etwa 10 MB — ein
 Überlauf würde den ganzen Auftrag mitreißen. Sie liegen deshalb nur im
 Arbeitsspeicher des Service Workers. Übersteht ein Auftrag einen Worker-Neustart,
-geht er ohne Anhang raus; das steht dann am Eintrag in der Warteschlange und wird
-nicht verschwiegen. Der eigentliche Eintrag ist davon nie betroffen.
+geht er ohne Anhang raus. Gesagt wird das an jeder Stelle, an der die Erweiterung
+sonst „gesichert“ meldet: am Eintrag in der Warteschlange, in der Quittung im
+Popup **und** in der Erfolgs-Benachrichtigung. Letztere ist der wichtigere Weg —
+ein Auftrag, der beim späten Versuch gelingt, verlässt die Warteschlange, und mit
+ihm verschwände der Vermerk. Der eigentliche Eintrag ist davon nie betroffen.
 
 ### Wenn etwas nicht durchgeht
 
@@ -477,7 +480,10 @@ inzwischen gegen den Server geprüft; so steht es jetzt:
    den Wettlauf zweier gleichzeitiger Anfragen ab. Ein Auftrag mit eigenem
    Zitierschlüssel nimmt deshalb dauerhaft nicht den Ein-Request-Pfad, sondern
    den Fallback, wo `POST /sources` den `citekey` annimmt. Kein erfundenes Feld,
-   kein stiller Verlust — ein Request mehr, und das bleibt so.
+   kein stiller Verlust — ein Request mehr, und das bleibt so. Ist der Schlüssel
+   dort schon vergeben, sendet die Erweiterung vertragsgemäß ohne ihn erneut und
+   der Server vergibt einen eigenen; **auch das steht dann in der Quittung**,
+   sonst wäre der Verlust an der letzten Stelle doch noch still geworden.
 
 Die ersten beiden und die vierte stecken in `src/background/capture-runner.js`,
 die dritte in `src/shared/duplicates.js`; alle sind mit Tests in

@@ -23,6 +23,7 @@ import { JOB_STATE } from '../src/shared/config.js';
 import { LIMITS } from '../src/shared/limits.js';
 import { summarizeDuplicates } from '../src/shared/duplicates.js';
 import { describeError, isRetryable, isScopeError, messageKeyForError } from '../src/shared/errors.js';
+import { incompleteNotices } from '../src/shared/outcome.js';
 
 const CLIENT_INFO = { platform: 'chrome', device: 'Chrome 131 / Linux', version: '0.1.0' };
 
@@ -397,6 +398,28 @@ describe('Erfassung: Fallback-Pfad (ohne /capture)', () => {
     assert.equal(calls[0].body.citekey, 'muster2019');
     assert.equal('citekey' in calls[1].body, false);
     assert.ok(job.progress.sourceId);
+
+    // Der Auftrag gelingt — und verliert dabei den Schluessel, den der Nutzer
+    // selbst eingetippt hat. Er verlaesst gleich darauf die Warteschlange,
+    // also muss der Vermerk hier stehen, sonst gibt es ihn nirgends mehr.
+    assert.equal(job.progress.citekeyDropped, 'muster2019');
+    assert.deepEqual(incompleteNotices(job.progress), [
+      { key: 'notice_citekey_dropped', substitutions: ['muster2019'] },
+    ]);
+  });
+
+  it('ohne Kollision bleibt der Zitierschluessel unvermerkt', async () => {
+    // Gegenprobe: der Vermerk darf nicht am blossen Vorhandensein eines
+    // Schluessels haengen, sonst meldet jede Quelle einen Verlust.
+    const { api } = makeClient(server);
+    const intent = baseIntent({ mode: 'source' });
+    intent.source = { ...intent.source, citekey: 'frei2026', url: 'https://example.org/frei' };
+    const job = makeJob(intent, 'job_citekey_frei');
+
+    await runCaptureJob(job, { api, capabilities: caps });
+
+    assert.equal(job.progress.citekeyDropped, undefined);
+    assert.deepEqual(incompleteNotices(job.progress), []);
   });
 
   it('lehnt eine Quelle ohne Titel und ohne Person clientseitig ab', async () => {

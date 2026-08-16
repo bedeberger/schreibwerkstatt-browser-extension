@@ -152,6 +152,10 @@ export const JOB_STATE = Object.freeze({
  * @property {boolean|null} [sourceCreated]
  * @property {boolean|null} [sourceLinked]
  * @property {boolean} [attachmentsLost]
+ * Zitierschluessel, den der Nutzer vergeben hat und der schon belegt war. Die
+ * Quelle wurde dann ohne ihn angelegt (`409 CITEKEY_TAKEN`, Wiederholung ohne
+ * das Feld) — festgehalten, damit die Quittung es sagen kann.
+ * @property {string} [citekeyDropped]
  * @property {'capture'|'split'|null} via
  */
 

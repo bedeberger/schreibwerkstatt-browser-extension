@@ -360,6 +360,12 @@ Der Client-Teil im Anschluss gehört in
   Sprachdateien immer `schreibwerkstatt.example.com`.
 - **Kein stilles Verwerfen.** Gescheiterte Aufträge bleiben in der Warteschlange,
   bis der Nutzer sie verwirft; jede Fehlermeldung nennt den `error_code`.
+  Das gilt auch für Aufträge, die **gelingen und dabei etwas verlieren** — ein
+  Anhang, der den Worker-Neustart nicht überlebt hat, ein schon vergebener
+  `citekey`. Solche Vorbehalte stehen in [outcome.js](src/shared/outcome.js) und
+  gehören an *jede* Stelle, die sonst „gesichert" meldet. Die Warteschlange
+  allein genügt nicht: ein erfolgreicher Auftrag verlässt sie, und der Vermerk
+  ginge mit ihm — deshalb trägt die Erfolgs-Benachrichtigung ihn mit.
 - **i18n:** keine hartcodierten Strings, keine Inline-Styles, beide
   `_locales/{de,en}/messages.json` deckungsgleich —
   [test/i18n.test.js](test/i18n.test.js) erzwingt das.

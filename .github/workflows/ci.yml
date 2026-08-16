@@ -50,6 +50,12 @@ jobs:
       # zu package.json passt.
       - run: npm ci
 
+      # Das `test`-Skript uebergibt `test/*.test.js` UNGEQUOTET — die Shell
+      # loest den Stern auf, nicht Node. Ein gequoteter `**`-Ausdruck kann das
+      # erst ab Node 22 selbst; auf Node 20 endete er in „Could not find" und
+      # genau diese Zeile war ueber sechs Releases hinweg rot, waehrend die
+      # Node-24-Spalte gruen blieb. Folge der Shell-Variante: ein Test in einem
+      # UNTERverzeichnis von test/ liefe nicht mit — heute liegt keiner dort.
       - run: npm test
 
       # Baut nach dist/. Faengt fehlende Importe und nicht getrackte Dateien,

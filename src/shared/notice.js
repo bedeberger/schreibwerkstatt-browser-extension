@@ -70,7 +70,7 @@ export function hideNotice(node) {
  * Viewer-Buecher werden ausgegraut, nicht versteckt — nur so erkennt der
  * Nutzer, dass es das Buch gibt, aber nicht schreibbar ist.
  *
- * @param {{id: number|string, name: string, role?: string}} book
+ * @param {Record<string, any>} book Eintrag aus `GET /books`: `id`, `name`, `role`
  * @param {(key: string, substitutions?: string[]) => string} translate
  * @returns {HTMLOptionElement}
  */

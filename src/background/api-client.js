@@ -378,7 +378,8 @@ export function createApiClient({ getConfig, fetchImpl, getClientInfo, onAuthErr
  * Baut den Wert fuer `X-Client-Device` aus `navigator.userAgentData`,
  * mit Rueckfall auf den klassischen User-Agent.
  *
- * @param {Navigator|WorkerNavigator} [nav]
+ * @param {Navigator} [nav] im Service Worker ein `WorkerNavigator`; gelesen
+ *   werden nur Felder, die beide haben
  * @returns {string} z. B. "Chrome 131 / Linux"
  */
 export function describeDevice(nav = globalThis.navigator) {

@@ -14,6 +14,7 @@ import { createApiClient, describeDevice } from './api-client.js';
 import { probeCapabilities } from './capabilities.js';
 import { runCaptureJob } from './capture-runner.js';
 import { createAttachmentStore } from './attachment-store.js';
+import { createIdbBackend } from './idb.js';
 import { createHandlers, lookupHandler } from './handlers.js';
 import { createQueue } from './queue.js';
 import { createStore } from './state.js';
@@ -111,18 +112,17 @@ function rememberOutcome(jobId, progress) {
 }
 
 /**
- * Anhaenge (Screenshot, PDF) NUR im Arbeitsspeicher.
+ * Anhaenge (Screenshot, PDF) liegen getrennt von der Warteschlange: im
+ * Arbeitsspeicher und darunter in IndexedDB, damit sie Wiederholungen nach
+ * einem Worker-Neustart ueberstehen. Warum nicht in `chrome.storage.local`,
+ * steht in `attachment-store.js`.
  *
- * Sie gehoeren bewusst nicht in die persistierte Warteschlange: ein PDF darf
- * 25 MB gross sein, als base64 also rund 33 MB — `chrome.storage.local` fasst
- * aber nur etwa 10 MB. Wuerden wir sie mitschreiben, ginge beim Ueberlauf der
- * gesamte Auftrag verloren, nicht nur der Anhang.
- *
- * Folge: ueberlebt ein Auftrag den Neustart des Workers, wird er ohne Anhang
- * gesendet. Der Verlust wird am Auftrag vermerkt und in den Optionen angezeigt
- * — er passiert nicht stillschweigend.
+ * Fehlt ein Anhang trotzdem (IndexedDB nicht verfuegbar), wird der Verlust am
+ * Auftrag vermerkt und in den Optionen angezeigt — nicht stillschweigend.
  */
-const attachmentCache = createAttachmentStore();
+const attachmentCache = createAttachmentStore({
+  backend: typeof indexedDB !== 'undefined' ? createIdbBackend() : null,
+});
 
 // ---------------------------------------------------------------------------
 // Badge
@@ -270,7 +270,11 @@ async function checkResearchDuplicate(capabilities, message) {
     });
     return {
       supported: true,
-      ...summarizeDuplicates({ items, url: message.url, limit: RESEARCH_LIST.LIMIT_MAX }),
+      ...summarizeDuplicates({
+        items: /** @type {import('../shared/duplicates.js').ResearchListItem[]} */ (items),
+        url: message.url,
+        limit: RESEARCH_LIST.LIMIT_MAX,
+      }),
     };
   } catch (error) {
     const err = /** @type {any} */ (error);
@@ -348,7 +352,7 @@ async function fetchPdfInPage(tabId, pdfUrl) {
   const results = await chrome.scripting.executeScript({
     target: { tabId },
     args: [pdfUrl, LIMITS.DOC_MAX_BYTES],
-    func: async (url, maxBytes) => {
+    func: async (/** @type {string} */ url, /** @type {number} */ maxBytes) => {
       try {
         const response = await fetch(url, { credentials: 'include' });
         if (!response.ok) return { error: `HTTP_${response.status}` };
@@ -358,7 +362,7 @@ async function fetchPdfInPage(tabId, pdfUrl) {
         let binary = '';
         const chunk = 0x8000;
         for (let i = 0; i < bytes.length; i += chunk) {
-          binary += String.fromCharCode.apply(null, Array.from(bytes.subarray(i, i + chunk)));
+          binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
         }
         return { base64: btoa(binary), size: buffer.byteLength };
       } catch (error) {
@@ -434,7 +438,7 @@ async function processQueue() {
     for (const job of jobs) {
       // Ein Auftrag im Undo-Fenster wird beim Faelligwerden regulaer gesendet.
       await queue.update(job.id, { state: JOB_STATE.RUNNING });
-      restoreAttachments(job);
+      await restoreAttachments(job);
       try {
         await runCaptureJob(job, {
           api,
@@ -443,15 +447,15 @@ async function processQueue() {
         });
         rememberOutcome(job.id, job.progress);
         await queue.complete(job.id);
-        attachmentCache.delete(job.id);
+        await attachmentCache.delete(job.id);
         await notifySuccess(job);
       } catch (error) {
         job.intent.attachments = {};
         const { willRetry } = await queue.fail(job.id, error, job.progress);
-        if (!willRetry) {
-          attachmentCache.delete(job.id);
-          await notifyFailure(job, error);
-        }
+        // Auch nach dem endgueltigen Scheitern bleibt der Anhang liegen: der
+        // Nutzer kann den Auftrag in den Optionen erneut anstossen, und dann
+        // soll er vollstaendig rausgehen. Weg ist er erst mit dem Verwerfen.
+        if (!willRetry) await notifyFailure(job, error);
       }
     }
   } finally {
@@ -467,8 +471,8 @@ async function processQueue() {
  *
  * @param {import('../shared/config.js').CaptureJob} job
  */
-function restoreAttachments(job) {
-  const cached = attachmentCache.get(job.id);
+async function restoreAttachments(job) {
+  const cached = await attachmentCache.get(job.id);
   job.intent.attachments = cached || {};
 
   if (attachmentsAreLost(job.intent.attachmentsDeclared || {}, job.progress, !!cached)) {
@@ -506,12 +510,15 @@ async function notify(id, options) {
   if (!settings.notifications) return;
   if (!chrome.notifications) return;
   try {
-    await chrome.notifications.create(id, {
-      type: 'basic',
-      iconUrl: chrome.runtime.getURL('icons/icon-128.png'),
-      silent: true,
-      ...options,
-    });
+    await chrome.notifications.create(
+      id,
+      /** @type {chrome.notifications.NotificationCreateOptions} */ ({
+        type: 'basic',
+        iconUrl: chrome.runtime.getURL('icons/icon-128.png'),
+        silent: true,
+        ...options,
+      }),
+    );
   } catch {
     // Benachrichtigungen sind Komfort, kein Vertrag.
   }
@@ -750,7 +757,7 @@ if (chrome.notifications) {
     void (async () => {
       const jobId = notificationId.slice(UNDO_NOTIFICATION_PREFIX.length);
       const undone = await queue.undo(jobId);
-      if (undone) attachmentCache.delete(jobId);
+      if (undone) await attachmentCache.delete(jobId);
       await chrome.notifications.clear(notificationId);
       await refreshBadge();
       await notify(`undone:${jobId}`, {
@@ -787,6 +794,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 // Beim Kaltstart des Workers den Zustand wiederherstellen.
 void (async () => {
+  await attachmentCache.prune(async () => (await queue.list()).map((job) => job.id));
   await refreshBadge();
   await scheduleNextWake();
 })();

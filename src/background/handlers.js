@@ -25,9 +25,9 @@ import { fileNameFromUrl, normalizeServerUrl, toOriginPattern } from '../shared/
 
 /**
  * @typedef {object} HandlerCtx
- * @property {ReturnType<import('./api-client.js').createApiClient>} api
- * @property {ReturnType<import('./queue.js').createQueue>} queue
- * @property {ReturnType<import('./state.js').createStore>} store
+ * @property {ReturnType<typeof import('./api-client.js').createApiClient>} api
+ * @property {ReturnType<typeof import('./queue.js').createQueue>} queue
+ * @property {ReturnType<typeof import('./state.js').createStore>} store
  * @property {() => Promise<void>} refreshBadge
  * @property {() => Promise<void>} processQueue
  * @property {() => Promise<void>} scheduleNextWake
@@ -36,13 +36,12 @@ import { fileNameFromUrl, normalizeServerUrl, toOriginPattern } from '../shared/
  * @property {(capabilities: object, message: object) => Promise<object>} checkSourceDuplicate
  * @property {(capabilities: object, message: object) => Promise<object>} checkResearchDuplicate
  * @property {(force?: boolean) => Promise<Array<Record<string, any>>>} fetchBooks
- * @property {(api: any, force?: boolean) => Promise<object>} probeCapabilitiesFn
  * @property {(tabId: number, options?: object) => Promise<any>} harvestTab
  * @property {(windowId: number) => Promise<{base64: string, contentType: string, size: number}>} captureScreenshot
  * @property {(tabId: number, pdfUrl: string) => Promise<{base64?: string, size?: number, error?: string}>} fetchPdfInPage
  * @property {() => Promise<chrome.tabs.Tab|null>} activeTab
  * @property {(id: string, options: chrome.notifications.NotificationOptions) => Promise<void>} notify
- * @property {Map<string, Record<string, any>>} attachmentCache
+ * @property {ReturnType<typeof import('./attachment-store.js').createAttachmentStore>} attachmentCache
  * @property {Map<string, import('../shared/config.js').CaptureProgress>} lastOutcome
  * @property {(job: object, delayMs: number) => Promise<void>} showUndoNotification
  * @property {() => string} extensionVersion
@@ -142,7 +141,8 @@ export function createHandlers(ctx) {
         };
       }
 
-      // Die Nutzdaten bleiben im Speicher, nur die Absicht wird persistiert.
+      // Die Nutzdaten gehen in die Anhang-Ablage, in der Warteschlange steht
+      // nur, dass es sie gibt.
       intent.attachments = {};
       intent.attachmentsDeclared = {
         screenshot: !!attachments.screenshot,
@@ -150,7 +150,7 @@ export function createHandlers(ctx) {
       };
 
       const job = await ctx.queue.add(intent, { holdMs: 0 });
-      if (attachments.screenshot || attachments.pdf) ctx.attachmentCache.set(job.id, attachments);
+      if (attachments.screenshot || attachments.pdf) await ctx.attachmentCache.set(job.id, attachments);
       await ctx.refreshBadge();
       // Sofort versuchen; bei Erfolg ist der Auftrag beim Antworten schon weg.
       await ctx.processQueue();
@@ -182,14 +182,14 @@ export function createHandlers(ctx) {
 
     async [MSG.UNDO_JOB](message) {
       const undone = await ctx.queue.undo(message.jobId);
-      if (undone) ctx.attachmentCache.delete(message.jobId);
+      if (undone) await ctx.attachmentCache.delete(message.jobId);
       await ctx.refreshBadge();
       return { undone };
     },
 
     async [MSG.DISCARD_JOB](message) {
       await ctx.queue.discard(message.jobId);
-      ctx.attachmentCache.delete(message.jobId);
+      await ctx.attachmentCache.delete(message.jobId);
       await ctx.refreshBadge();
       return { counts: await ctx.queue.counts() };
     },

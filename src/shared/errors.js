@@ -28,6 +28,12 @@ export class ApiError extends Error {
     this.params = params;
     this.networkError = networkError;
     if (cause !== undefined) this.cause = cause;
+    /** Antwort war JSON — unterscheidet ein fachliches 404 vom Express-404. */
+    this.jsonBody = false;
+    /** Die ersten 500 Zeichen der Antwort, fuer die Faehigkeits-Erkennung. */
+    this.bodyText = '';
+    /** Angefragter Pfad; der Scope-Fehlercode sagt nicht, welcher Scope fehlt. */
+    this.path = '';
   }
 
   toJSON() {

@@ -113,7 +113,18 @@ export const JOB_STATE = Object.freeze({
  * @property {string[]} tags
  * @property {Array<{url: string, label: string}>} urls
  * @property {SourceDraft} source
- * @property {{pdfDataUrl?: string|null, screenshotDataUrl?: string|null}} attachments
+ * @property {CaptureAttachments} attachments Nutzdaten; in der persistierten
+ *   Warteschlange immer leer, sie liegen in der Anhang-Ablage
+ * @property {{screenshot: boolean, pdf: boolean}} [attachmentsDeclared] welche
+ *   Anhaenge der Auftrag haben soll — Grundlage fuer `attachmentsLost`
+ */
+
+/**
+ * `bytes` ist base64 oder schon binaer; `toBinary` im Capture-Runner nimmt beides.
+ *
+ * @typedef {object} CaptureAttachments
+ * @property {{bytes: string|Uint8Array|ArrayBuffer, contentType: string}} [screenshot]
+ * @property {{bytes: string|Uint8Array|ArrayBuffer, contentType?: string, name?: string}} [pdf]
  */
 
 /**

@@ -1,12 +1,12 @@
 {
   "name": "schreibwerkstatt-browser-extension",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "Chrome-Erweiterung: Webseiten als Recherche-Fundstueck oder zitierfaehige Quelle in die Schreibwerkstatt schicken.",
   "private": true,
   "type": "module",
   "license": "MIT",
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "scripts": {
     "build": "node build.mjs",
@@ -15,6 +15,7 @@
     "package": "node build.mjs && node tools/package.mjs",
     "promo": "node tools/make-promo.mjs",
     "test": "node --test test/*.test.js",
+    "typecheck": "tsc -p jsconfig.json",
     "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
     "review-server": "node tools/review-server.mjs",
     "shots": "node build.mjs && node tools/make-shots.mjs",
@@ -25,7 +26,10 @@
     "@mozilla/readability": "^0.6.0"
   },
   "devDependencies": {
-    "esbuild": "^0.28.1",
-    "jsdom": "^29.1.1"
+    "@types/chrome": "^0.3.0",
+    "esbuild": "^0.28.2",
+    "fake-indexeddb": "^6.2.5",
+    "jsdom": "^29.1.1",
+    "typescript": "^7.0.2"
   }
 }

@@ -50,7 +50,7 @@ export function extractArticleText(doc, max = LIMITS.BODY_MAX) {
   try {
     // Readability veraendert das uebergebene Dokument — niemals das echte
     // Seiten-DOM hineingeben, sonst zerlegt die Erweiterung die Webseite.
-    const clone = doc.cloneNode(true);
+    const clone = /** @type {Document} */ (doc.cloneNode(true));
     parsed = new Readability(clone, { keepClasses: false }).parse();
   } catch {
     parsed = null;
@@ -83,7 +83,7 @@ function fallbackText(doc) {
   const candidates = doc.querySelectorAll('article, main, [role="main"], #content, .content, body');
   let best = '';
   for (const node of candidates) {
-    const clone = node.cloneNode(true);
+    const clone = /** @type {Element} */ (node.cloneNode(true));
     for (const junk of clone.querySelectorAll('script, style, noscript, nav, header, footer, aside, form, iframe')) {
       junk.remove();
     }

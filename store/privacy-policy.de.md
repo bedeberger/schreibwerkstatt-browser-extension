@@ -101,8 +101,10 @@ Schlüsselbund, das Token liegt also unverschlüsselt — wie jedes andere
 Erweiterungsgeheimnis in Chrome. Es wird nur im `Authorization`-Header an den
 von dir eingetragenen Host geschickt und nirgends protokolliert.
 
-Anhänge (Screenshot, PDF) landen **nicht** im lokalen Speicher, sondern nur im
-Arbeitsspeicher des Service Workers, und verschwinden mit ihm.
+Anhänge (Screenshot, PDF), die du ausdrücklich mitschickst, liegen in der
+IndexedDB der Erweiterung auf deinem Gerät — nur so lange, bis ihr Eintrag
+gesendet ist oder du ihn verwirfst. Danach werden sie gelöscht. Das dient allein
+dazu, dass ein Anhang eine Wiederholung nach einem Verbindungsfehler übersteht.
 
 ## 6. Berechtigungen und warum sie nötig sind
 
@@ -119,8 +121,8 @@ Arbeitsspeicher des Service Workers, und verschwinden mit ihm.
 ## 7. Löschung
 
 - **Lokale Daten:** Erweiterung deinstallieren. Chrome löscht
-  `chrome.storage.local` vollständig — Token, Buchliste und Warteschlange
-  inklusive. Einzelne Werte kannst du auch auf der Options-Seite zurücksetzen.
+  `chrome.storage.local` und die IndexedDB der Erweiterung vollständig — Token,
+  Buchliste, Warteschlange und zwischengelagerte Anhänge inklusive. Einzelne Werte kannst du auch auf der Options-Seite zurücksetzen.
 - **Bereits gesendete Einträge:** die verwaltest du in der Web-App deiner
   Schreibwerkstatt. Die Erweiterung kann sie nicht löschen; die API der App
   kennt dafür keinen Endpunkt.

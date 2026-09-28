@@ -26,7 +26,7 @@ import { serverNormalizeUrl } from '../shared/url.js';
 
 /**
  * @typedef {object} RunContext
- * @property {ReturnType<import('./api-client.js').createApiClient>} api
+ * @property {ReturnType<typeof import('./api-client.js').createApiClient>} api
  * @property {{capture: boolean, byUrl: boolean}} capabilities
  * @property {(event: string, detail?: Record<string, any>) => void} [log]
  * @property {(name: 'capture'|'byUrl') => void} [onCapabilityMissing]
@@ -228,6 +228,7 @@ function sourceFields(draft) {
  * @returns {{ payload: Record<string, any>, truncations: import('../shared/limits.js').Truncation[] }}
  */
 export function buildCapturePayload(intent) {
+  /** @type {Partial<import('../shared/config.js').SourceDraft>} */
   const draft = intent.source || {};
   const url = intent.normalizedUrl || intent.url || '';
 
@@ -316,6 +317,7 @@ export function buildResearchPayload(intent) {
  * @returns {{ payload: Record<string, any>, truncations: import('../shared/limits.js').Truncation[] }}
  */
 export function buildSourcePayload(intent) {
+  /** @type {Partial<import('../shared/config.js').SourceDraft>} */
   const draft = intent.source || {};
   const fallbackUrl = intent.normalizedUrl || intent.url || '';
   /** @type {Record<string, any>} */

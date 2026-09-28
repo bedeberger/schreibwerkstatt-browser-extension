@@ -60,7 +60,7 @@ Argumente: `$ARGUMENTS`
 Alles in einem Rutsch, dann auswerten:
 
 ```bash
-node -v                                        # ≥ 20
+node -v                                        # ≥ 22
 git rev-parse --abbrev-ref HEAD                # erwartet: main
 git status --porcelain --untracked-files=all   # darf voll sein — kommt mit
 git fetch --tags --quiet origin
@@ -125,10 +125,11 @@ Beides muss leer sein.
 
 ```bash
 npm test
+npm run typecheck
 ```
 
-382 Tests, kein Netz nötig. Ein einziger Fehlschlag beendet den Release —
-Ausgabe zeigen, nichts umdeuten.
+Kein Netz nötig. Ein einziger Fehlschlag — Test oder Typfehler — beendet den
+Release. Ausgabe zeigen, nichts umdeuten.
 
 ## 4. Paket bauen
 

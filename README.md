@@ -120,13 +120,16 @@ Tastenkürzel für dasselbe: <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>Q</kbd>.
 
 Anhänge werden **nicht** mit in die Warteschlange geschrieben: ein 25-MB-PDF wäre
 als base64 rund 33 MB, `chrome.storage.local` fasst aber nur etwa 10 MB — ein
-Überlauf würde den ganzen Auftrag mitreißen. Sie liegen deshalb nur im
-Arbeitsspeicher des Service Workers. Übersteht ein Auftrag einen Worker-Neustart,
-geht er ohne Anhang raus. Gesagt wird das an jeder Stelle, an der die Erweiterung
-sonst „gesichert“ meldet: am Eintrag in der Warteschlange, in der Quittung im
-Popup **und** in der Erfolgs-Benachrichtigung. Letztere ist der wichtigere Weg —
-ein Auftrag, der beim späten Versuch gelingt, verlässt die Warteschlange, und mit
-ihm verschwände der Vermerk. Der eigentliche Eintrag ist davon nie betroffen.
+Überlauf würde den ganzen Auftrag mitreißen. Sie liegen stattdessen getrennt in
+der IndexedDB der Erweiterung, bis ihr Auftrag gesendet oder verworfen ist. So
+überstehen sie auch Wiederholungen, zwischen denen Chrome den Service Worker
+beendet hat. Kann IndexedDB nicht schreiben (Kontingent, gesperrter Speicher),
+bleibt der Anhang nur im Arbeitsspeicher. Geht er damit verloren, sagt die
+Erweiterung das an jeder Stelle, an der sie sonst „gesichert“ meldet: am Eintrag
+in der Warteschlange, in der Quittung im Popup **und** in der
+Erfolgs-Benachrichtigung. Letztere ist der wichtigere Weg — ein Auftrag, der beim
+späten Versuch gelingt, verlässt die Warteschlange, und mit ihm verschwände der
+Vermerk. Der eigentliche Eintrag ist davon nie betroffen.
 
 ### Wenn etwas nicht durchgeht
 
@@ -272,7 +275,8 @@ verwaltest du in der Web-App.
 npm install
 npm run build      # dist/ erzeugen
 npm run watch      # dist/ beobachten (statische Dateien nur beim Start kopiert)
-npm test           # 230 Tests, kein Server nötig
+npm test           # alle Tests, kein Server nötig
+npm run typecheck  # JSDoc-Typen prüfen (tsc, erzeugt nichts)
 npm run icons      # Symbole aus tools/make-icons.mjs neu erzeugen
 npm run package    # store-fertiges ZIP unter store/ erzeugen
 npm run promo      # Werbekacheln für den Store rendern (braucht Chrome)
@@ -281,7 +285,7 @@ npm run review-server   # Referenz-Server für die Store-Prüfung (REVIEW_TOKEN 
 npm run clean      # dist/ löschen
 ```
 
-Voraussetzung: Node ≥ 20 (getestet mit 24).
+Voraussetzung: Node ≥ 22 (getestet mit 22 und 24).
 
 ### Tests
 

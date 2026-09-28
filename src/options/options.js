@@ -369,7 +369,7 @@ function detectedLabel(value) {
  * @param {string} mode
  */
 async function setCapabilityMode(name, mode) {
-  if (!Object.values(CAPABILITY_MODE).includes(mode)) return;
+  if (!Object.values(CAPABILITY_MODE).includes(/** @type {any} */ (mode))) return;
   await send(MSG.SET_CAPABILITY_MODE, { name, mode });
   flash(ui.settingsSaved);
 }

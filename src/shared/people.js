@@ -7,6 +7,13 @@
  * ein falsch zerlegter Name faellt dagegen nicht auf.
  */
 
+/**
+ * Person im CSL-Sinne: entweder zerlegt (`family`/`given`) oder, wenn sich ein
+ * Name nicht sinnvoll zerlegen laesst (Organisationen), als `literal`.
+ *
+ * @typedef {{family?: string, given?: string, literal?: string}} Person
+ */
+
 /** Namenspartikel, die zum Nachnamen gehoeren. */
 const PARTICLES = new Set([
   'von', 'vom', 'van', 'ver', 'de', 'del', 'della', 'dello', 'degli', 'dei', 'di', 'da', 'das',
@@ -70,7 +77,7 @@ function looksLikeOrganisation(value) {
  * Zerlegt einen einzelnen Namen.
  *
  * @param {unknown} raw
- * @returns {{family: string, given: string}|{literal: string}|null}
+ * @returns {Person|null}
  */
 export function parsePerson(raw) {
   if (raw && typeof raw === 'object') {
@@ -179,7 +186,7 @@ function stripTitles(tokens) {
  * Strings oder ein Array von Objekten (JSON-LD).
  *
  * @param {unknown} input
- * @returns {Array<{family: string, given: string}|{literal: string}>}
+ * @returns {Person[]}
  */
 export function parsePeople(input) {
   if (input === null || input === undefined) return [];
@@ -243,7 +250,7 @@ function looksLikePairs(parts) {
 }
 
 /**
- * @param {Array<{family?: string, given?: string, literal?: string}>} people
+ * @param {Person[]} people
  */
 function dedupe(people) {
   const seen = new Set();
@@ -261,7 +268,7 @@ function dedupe(people) {
 
 /**
  * Anzeigeform, auch fuer die Rueckkonvertierung ins Popup-Textfeld.
- * @param {{family?: string, given?: string, literal?: string}} person
+ * @param {Person} person
  * @returns {string}
  */
 export function formatPerson(person) {
@@ -272,7 +279,7 @@ export function formatPerson(person) {
 }
 
 /**
- * @param {Array<{family?: string, given?: string, literal?: string}>} people
+ * @param {Person[]} people
  * @returns {string} "Muster, Max; Beispiel, Eva"
  */
 export function formatPeople(people) {

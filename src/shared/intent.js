@@ -34,7 +34,7 @@ export function intentFromHarvest(harvested, options = {}) {
   const kind = hasSelection
     ? 'quote'
     : RESEARCH_KINDS.includes(options.defaultKind)
-      ? options.defaultKind
+      ? /** @type {import('./config.js').CaptureIntent['kind']} */ (options.defaultKind)
       : 'link';
 
   // Nur der geerntete Fliesstext wird gekuerzt; ein Zitat, das laenger als

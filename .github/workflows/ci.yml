@@ -36,12 +36,12 @@ jobs:
       matrix:
         # Untergrenze aus `engines` und aktuelles LTS. Was dazwischen liegt,
         # bringt keinen zusaetzlichen Befund.
-        node: ['20', '24']
+        node: ['22', '24']
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: ${{ matrix.node }}
           cache: npm
@@ -57,6 +57,10 @@ jobs:
       # Node-24-Spalte gruen blieb. Folge der Shell-Variante: ein Test in einem
       # UNTERverzeichnis von test/ liefe nicht mit — heute liegt keiner dort.
       - run: npm test
+
+      # JSDoc-Typen gegen den Code pruefen (`checkJs`, siehe jsconfig.json).
+      # Erzeugt nichts; faengt vor allem Feldnamen, die nicht mehr stimmen.
+      - run: npm run typecheck
 
       # Baut nach dist/. Faengt fehlende Importe und nicht getrackte Dateien,
       # die die Tests nicht beruehren.

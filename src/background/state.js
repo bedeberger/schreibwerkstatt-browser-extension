@@ -48,14 +48,14 @@ export function createStore({
   async function getConfig() {
     const stored = await store.get([STORAGE_KEYS.SERVER_URL, STORAGE_KEYS.TOKEN]);
     return {
-      serverUrl: normalizeServer(stored[STORAGE_KEYS.SERVER_URL]) || '',
-      token: stored[STORAGE_KEYS.TOKEN] || '',
+      serverUrl: normalizeServer(/** @type {string} */ (stored[STORAGE_KEYS.SERVER_URL])) || '',
+      token: /** @type {string} */ (stored[STORAGE_KEYS.TOKEN]) || '',
     };
   }
 
   async function getSettings() {
     const stored = await store.get(STORAGE_KEYS.SETTINGS);
-    return { ...DEFAULT_SETTINGS, ...(stored[STORAGE_KEYS.SETTINGS] || {}) };
+    return { ...DEFAULT_SETTINGS, .../** @type {Partial<typeof DEFAULT_SETTINGS>} */ (stored[STORAGE_KEYS.SETTINGS] || {}) };
   }
 
   /** @param {Partial<typeof DEFAULT_SETTINGS>} patch */
@@ -86,7 +86,7 @@ export function createStore({
   /** @returns {Promise<import('../shared/config.js').TokenState>} */
   async function getTokenState() {
     const stored = await store.get(STORAGE_KEYS.TOKEN_STATE);
-    return stored[STORAGE_KEYS.TOKEN_STATE] || TOKEN_STATE.UNKNOWN;
+    return /** @type {import('../shared/config.js').TokenState} */ (stored[STORAGE_KEYS.TOKEN_STATE]) || TOKEN_STATE.UNKNOWN;
   }
 
   async function getCapabilities() {

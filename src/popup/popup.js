@@ -188,7 +188,8 @@ function prefill() {
   context.intent = intent;
 
   for (const radio of document.querySelectorAll('input[name="mode"]')) {
-    /** @type {HTMLInputElement} */ (radio).checked = radio.value === intent.mode;
+    const input = /** @type {HTMLInputElement} */ (radio);
+    input.checked = input.value === intent.mode;
   }
 
   ui.kind.value = intent.kind;

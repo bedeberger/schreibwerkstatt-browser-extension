@@ -234,6 +234,8 @@ class Field {
  * @property {string} cslType
  * @property {string} description
  * @property {Record<string, string>} provenance
+ * @property {string} [bylineHint] Autorenzeile von Readability, wenn die
+ *   Meta-Angaben keine Autoren kennen — nur als Hinweis im Popup
  */
 
 /**

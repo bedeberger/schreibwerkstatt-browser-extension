@@ -53,7 +53,7 @@ export function verdictFromError(error) {
 }
 
 /**
- * @param {ReturnType<import('./api-client.js').createApiClient>} api
+ * @param {ReturnType<typeof import('./api-client.js').createApiClient>} api
  * @returns {Promise<boolean|null>}
  */
 async function probeByUrl(api) {
@@ -69,7 +69,7 @@ async function probeByUrl(api) {
  * Probe mit leerem Koerper. Der Endpunkt verlangt `book_id`, `mode` und `url`
  * und muss deshalb mit 400 ablehnen — es entsteht kein Datensatz.
  *
- * @param {ReturnType<import('./api-client.js').createApiClient>} api
+ * @param {ReturnType<typeof import('./api-client.js').createApiClient>} api
  * @returns {Promise<boolean|null>}
  */
 async function probeCapture(api) {
@@ -96,12 +96,12 @@ async function probeCapture(api) {
  * Faehigkeit auf `false` zurueck. Die Verwechslung kostet einen Request, kein
  * falsches Ergebnis.
  *
- * @param {ReturnType<import('./api-client.js').createApiClient>} api
+ * @param {ReturnType<typeof import('./api-client.js').createApiClient>} api
  * @returns {Promise<{detected: boolean|null, scopeMissing: boolean}>}
  */
 export async function probeResearchList(api) {
   try {
-    await api.listResearch({});
+    await api.listResearch(/** @type {any} */ ({}));
     // Ohne `book_id` duerfte kein 200 kommen — der Endpunkt ist aber da.
     return { detected: true, scopeMissing: false };
   } catch (error) {
@@ -114,7 +114,7 @@ export async function probeResearchList(api) {
 }
 
 /**
- * @param {ReturnType<import('./api-client.js').createApiClient>} api
+ * @param {ReturnType<typeof import('./api-client.js').createApiClient>} api
  * @returns {Promise<{capture: boolean|null, byUrl: boolean|null, researchList: boolean|null, researchScopeMissing: boolean}>}
  */
 export async function probeCapabilities(api) {

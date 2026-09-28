@@ -91,8 +91,10 @@ so the token is stored unencrypted — as is every other extension secret in
 Chrome. It is only ever sent in the `Authorization` header to the host you
 entered, and is never logged.
 
-Attachments (screenshot, PDF) are **not** written to local storage. They live
-only in the service worker's memory and vanish with it.
+Attachments (screenshot, PDF) that you explicitly choose to send are kept in the
+extension's IndexedDB on your device — only until their entry has been sent or
+you discard it. They are deleted afterwards. This exists solely so that an
+attachment survives a retry after a connection failure.
 
 ## 6. Permissions and why they are needed
 
@@ -109,7 +111,8 @@ only in the service worker's memory and vanish with it.
 ## 7. Deletion
 
 - **Local data:** uninstall the extension. Chrome erases
-  `chrome.storage.local` entirely, token, book list and queue included.
+  `chrome.storage.local` and the extension's IndexedDB entirely, token, book
+  list, queue and stored attachments included.
   Individual values can also be reset on the options page.
 - **Entries already sent:** manage those in your Schreibwerkstatt web app. The
   extension cannot delete them; the app's API has no endpoint for it.

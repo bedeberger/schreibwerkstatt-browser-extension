@@ -11,6 +11,7 @@ npm install
 npm run build     # dist/ erzeugen (unmittelbar in chrome://extensions ladbar)
 npm run watch     # dist/ beobachten
 npm test          # alle Tests, kein Netz und kein Server nötig
+npm run typecheck # JSDoc-Typen prüfen (tsc über jsconfig.json, erzeugt nichts)
 npm run icons     # Symbole neu erzeugen
 npm run package   # store-fertiges ZIP unter store/ (baut vorher)
 npm run promo     # Werbekacheln für den Store
@@ -21,9 +22,10 @@ npm run store:publish  # Paket hochladen und einreichen (--dry-run prüft nur)
 npm run clean     # dist/ löschen
 ```
 
-Node ≥ 20. `npm test` muss vor jedem Commit grün sein.
-[.github/workflows/ci.yml](.github/workflows/ci.yml) wiederholt Test **und**
-Build bei jedem Push auf `main` und bei jedem PR, auf Node 20 und 24. Der
+Node ≥ 22. `npm test` und `npm run typecheck` müssen vor jedem Commit grün sein.
+[.github/workflows/ci.yml](.github/workflows/ci.yml) wiederholt Test,
+Typprüfung **und** Build bei jedem Push auf `main` und bei jedem PR, auf Node 22
+und 24. Der
 eigentliche Zweck ist der frische Klon: dort baut nur, was wirklich in Git liegt
 — eine vergessene, nicht getrackte Datei fällt lokal nie auf und hier immer.
 

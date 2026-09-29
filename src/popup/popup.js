@@ -133,6 +133,31 @@ async function init() {
   ui.form.hidden = false;
 
   void checkDuplicate();
+  void refreshBooksInBackground();
+}
+
+/**
+ * Die gespeicherte Liste steht sofort da; ein neu angelegtes Buch soll aber
+ * nicht erst nach einem Umweg ueber die Optionen auftauchen. Scheitert der
+ * Abruf, bleibt die gespeicherte Liste stehen — Token-Probleme meldet der
+ * Service Worker ueber den Token-Zustand.
+ */
+async function refreshBooksInBackground() {
+  let books;
+  try {
+    ({ books } = await send(MSG.REFRESH_BOOKS));
+  } catch {
+    return;
+  }
+  if (JSON.stringify(books) === JSON.stringify(context.state.books)) return;
+
+  const selected = ui.book.value;
+  context.state.books = books;
+  fillBooks(books, context.state.defaultBookId);
+  // Eine Auswahl, die der Nutzer schon getroffen hat, bleibt erhalten.
+  const stillWritable = books.find((book) => String(book.id) === selected && canWriteToBook(book));
+  if (stillWritable) ui.book.value = selected;
+  if (ui.book.value !== selected) void checkDuplicate();
 }
 
 function fillCslTypes() {

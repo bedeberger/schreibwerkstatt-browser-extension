@@ -193,6 +193,7 @@ p {
 .field__hint {
   font-size: 11px;
   color: var(--ink-faint);
+  overflow-wrap: anywhere;
 }
 
 .field__hint--warn {
@@ -372,9 +373,12 @@ p {
   background: var(--danger-soft);
 }
 
+/* Meldungen tragen oft URLs oder Pfade ohne Leerzeichen; ungebrochen
+   wuerden sie das Popup ueber seine 400px hinaus verbreitern. */
 .notice {
   padding: 7px 9px;
   font-size: 12px;
+  overflow-wrap: anywhere;
   border-radius: var(--radius-sm);
 }
 

@@ -533,6 +533,9 @@
   "popup_queue_chip": {
     "message": "$1 queued"
   },
+  "provenance_site": {
+    "message": "Wiki page detected – title, revision date and permalink from the page structure"
+  },
   "provenance_citation": {
     "message": "Metadata from citation_* tags (publisher-supplied)"
   },

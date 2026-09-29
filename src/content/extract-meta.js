@@ -5,17 +5,23 @@
  * damit sie in Node gegen HTML-Fixtures getestet werden kann.
  *
  * Prioritaetsreihenfolge (hoechste zuerst):
+ *   0. Seitenrezept (derzeit MediaWiki, siehe `mediawiki.js`) — nur fuer
+ *      Seiten, deren Struktur bekannt ist und deren Metadaten nachweislich
+ *      in die Irre fuehren
  *   1. Highwire / `citation_*`
  *   2. JSON-LD (schema.org Article & Verwandte)
  *   3. Dublin Core
  *   4. OpenGraph / `article:*`
  *   5. Fallback: <title>, rel=canonical, erstes <h1>
  *
+ * Titel aus OpenGraph und `<title>` verlieren einen angehaengten Site-Namen
+ * (`title-affix.js`), sofern er sich belegen laesst.
+ *
  * Jedes Feld merkt sich in `provenance`, aus welcher Schicht es stammt.
  * Das Popup zeigt das an, damit sichtbar ist, was belegt und was geraten ist.
  */
 
-import { parsePeople } from '../shared/people.js';
+import { formatPerson, parsePeople } from '../shared/people.js';
 import {
   clampLine,
   collapseWhitespace,
@@ -26,9 +32,12 @@ import {
   yearFromDate,
 } from '../shared/text.js';
 import { normalizeUrl, resolveUrl } from '../shared/url.js';
+import { harvestBylineDate, harvestBylineNames } from './byline.js';
+import { harvestMediaWiki } from './mediawiki.js';
+import { hostNameCandidates, splitTitleAffix, stripTitleAffix } from './title-affix.js';
 
 /** Reihenfolge der Schichten; frueher = staerker. */
-export const LAYERS = Object.freeze(['citation', 'jsonld', 'dublincore', 'opengraph', 'fallback']);
+export const LAYERS = Object.freeze(['site', 'citation', 'jsonld', 'dublincore', 'opengraph', 'fallback']);
 
 const ARTICLE_TYPES = new Set([
   'article',
@@ -129,16 +138,60 @@ export function collectJsonLdNodes(doc) {
     }
   };
 
+  const decode = entityDecoder(doc);
   for (const script of doc.querySelectorAll('script[type="application/ld+json"]')) {
     const raw = script.textContent;
     if (!raw || !raw.trim()) continue;
     try {
-      walk(JSON.parse(raw));
+      walk(decodeStrings(JSON.parse(raw), decode));
     } catch {
       // Kaputtes JSON-LD ist haeufig. Kein Grund, die Ernte abzubrechen.
     }
   }
   return nodes;
+}
+
+/**
+ * Manche CMS schreiben HTML-Entities in JSON-LD („AI &ldquo;Workslop&rdquo;"
+ * bei hbr.org). In JSON bedeuten sie nichts; im Titel stuenden sie woertlich.
+ * Dekodiert wird ueber ein nie eingehaengtes <textarea>: dessen Inhalt ist
+ * reiner Text, es wird nichts ausgefuehrt und nichts geladen.
+ *
+ * @param {Document} doc
+ * @returns {(value: string) => string}
+ */
+function entityDecoder(doc) {
+  /** @type {HTMLTextAreaElement|null} */
+  let area = null;
+  return (value) => {
+    if (!/&(?:#\d+|#x[\da-f]+|[a-z][a-z\d]*);/i.test(value)) return value;
+    try {
+      area = area || doc.createElement('textarea');
+      area.innerHTML = value;
+      return area.value;
+    } catch {
+      return value;
+    }
+  };
+}
+
+/**
+ * @param {any} value
+ * @param {(value: string) => string} decode
+ * @param {number} [depth]
+ * @returns {any}
+ */
+function decodeStrings(value, decode, depth = 0) {
+  if (typeof value === 'string') return decode(value);
+  if (!value || typeof value !== 'object' || depth > 12) return value;
+  if (Array.isArray(value)) return value.map((entry) => decodeStrings(entry, decode, depth + 1));
+  /** @type {Record<string, any>} */
+  const out = {};
+  for (const [key, entry] of Object.entries(value)) {
+    // Der Fliesstext ist fuer die Ernte ohne Belang und kann riesig sein.
+    out[key] = key === 'articleBody' ? entry : decodeStrings(entry, decode, depth + 1);
+  }
+  return out;
 }
 
 /**
@@ -169,6 +222,49 @@ export function pickJsonLdArticle(nodes) {
 }
 
 /**
+ * Knoten, die eine Seite beschreiben, nicht das Werk, zu dem sie gehoert.
+ * `product` ist Googles Paywall-Markup (`isPartOf` mit `productID
+ * "economist.com:showcase"`): das Abo, nicht die Publikation.
+ */
+const PAGE_TYPES = new Set(['webpage', 'collectionpage', 'itempage', 'profilepage', 'searchresultspage', 'product']);
+
+/**
+ * Index `@id` -> Knoten. Yoast (WordPress) und HubSpot legen Autor, Verlag
+ * und Website als eigene Knoten in den `@graph` und verweisen nur per `@id`.
+ * Ohne Aufloesung landet die Adresse des Verweises als Name im Formular.
+ *
+ * @param {Record<string, any>[]} nodes
+ * @returns {Map<string, Record<string, any>>}
+ */
+function indexJsonLdIds(nodes) {
+  /** @type {Map<string, Record<string, any>>} */
+  const byId = new Map();
+  for (const node of nodes) {
+    const id = node['@id'];
+    if (typeof id !== 'string' || byId.has(id)) continue;
+    // Ein blosser Verweis ({"@id": …}) ist kein Knoten mit Inhalt.
+    if (Object.keys(node).some((key) => key !== '@id' && key !== '@type')) byId.set(id, node);
+  }
+  return byId;
+}
+
+/**
+ * Ersetzt Verweise durch die Knoten, auf die sie zeigen. Unaufloesbare
+ * Verweise bleiben stehen; `schemaName` und `parsePeople` ignorieren sie.
+ *
+ * @param {any} value
+ * @param {Map<string, Record<string, any>>} byId
+ * @returns {any}
+ */
+function deref(value, byId) {
+  if (Array.isArray(value)) return value.map((entry) => deref(entry, byId));
+  if (value && typeof value === 'object' && typeof value['@id'] === 'string' && !value.name) {
+    return byId.get(value['@id']) || value;
+  }
+  return value;
+}
+
+/**
  * Zieht einen Namen aus schema.org-Werten, die String, Objekt oder Array sein duerfen.
  * @param {any} value
  * @returns {string}
@@ -177,9 +273,64 @@ function schemaName(value) {
   if (!value) return '';
   if (typeof value === 'string') return collapseWhitespace(value);
   if (Array.isArray(value)) return schemaName(value[0]);
-  if (typeof value === 'object') return collapseWhitespace(value.name || value['@id'] || '');
+  if (typeof value === 'object') return collapseWhitespace(typeof value.name === 'string' ? value.name : '');
   return '';
 }
+
+/**
+ * Name des Werks, zu dem der Artikel gehoert — aber nicht der Name der
+ * eigenen Seite. Yoast setzt `isPartOf` auf den WebPage-Knoten, dessen
+ * `name` „Titel - Site" lautet; als Zeitschrift waere das Unsinn.
+ *
+ * @param {any} value
+ * @returns {string}
+ */
+function containerName(value) {
+  const node = Array.isArray(value) ? value[0] : value;
+  if (node && typeof node === 'object' && typesOf(node).some((type) => PAGE_TYPES.has(type))) return '';
+  return schemaName(node);
+}
+
+/**
+ * Personen aus Metadaten, ohne das, was dort oft statt eines Namens steht:
+ * Profil-URL (`article:author` bei Facebook-Konventionen), Handle
+ * (`twitter:creator` = "@redaktion"), E-Mail-Adresse. `parsePeople` behaelt
+ * solche Werte bewusst als `literal`, weil es auch Eingaben von Hand zerlegt;
+ * beim Ernten sind sie kein Name, sondern Rauschen.
+ *
+ * Ebenso raus: die Zeitung als ihr eigener Autor („The Economist" bei
+ * The Economist) und Platzhalter im Plural wie „Auswärtige Autoren NZZ".
+ * Das ist keine Autorschaft, sondern ein Hinweis darauf, dass keine genannt
+ * wird — bei der NZZ steht der Name dann in `<meta name="author">`, eine
+ * Schicht tiefer. Eine benannte Redaktion („Redaktion Beispiel-Zeitung",
+ * „HubSpot Staff") bleibt dagegen stehen: sie ist eine Koerperschaft, die
+ * zeichnet.
+ *
+ * Bleibt nichts uebrig, ist das Ergebnis leer, und die naechste Schicht kommt
+ * zum Zug (`Field.set` ignoriert leere Listen).
+ *
+ * @param {unknown} input
+ * @param {string[]} [siteNames] Namen der Website und des Verlags
+ */
+function harvestPeople(input, siteNames = []) {
+  const sites = siteNames.map(foldName).filter(Boolean);
+  return parsePeople(input).filter((person) => {
+    if (person.literal && NOT_A_NAME.test(person.literal)) return false;
+    const name = formatPerson(person);
+    if (COLLECTIVE_AUTHOR.test(name)) return false;
+    return !sites.includes(foldName(name));
+  });
+}
+
+/** Platzhalter im Plural, die an der Stelle eines Namens stehen. */
+const COLLECTIVE_AUTHOR = /(^|\s)(autoren|autorinnen|contributors|agenturen|mitarbeitende)(\s|$)/i;
+
+/** @param {string} value */
+function foldName(value) {
+  return String(value || '').toLowerCase().replace(/^(the|die|der|das)\s+/, '').replace(/[^\p{L}\p{N}]+/gu, '');
+}
+
+const NOT_A_NAME = /^(?:https?:\/\/|www\.)|^@[\w.]+$|^[^\s@]+@[^\s@]+\.[^\s@]+$/i;
 
 /**
  * Kandidatensammlung mit Herkunft.
@@ -188,6 +339,15 @@ class Field {
   constructor() {
     /** @type {Map<string, any>} */
     this.byLayer = new Map();
+    this.blocked = false;
+  }
+
+  /**
+   * Das Feld bleibt leer, egal was die Schichten liefern — fuer Angaben, die
+   * auf einer bekannten Seite nachweislich falsch sind. Leer ist ehrlicher.
+   */
+  block() {
+    this.blocked = true;
   }
 
   /**
@@ -204,6 +364,7 @@ class Field {
    * @returns {{value: any, layer: string}|null}
    */
   resolve() {
+    if (this.blocked) return null;
     for (const layer of LAYERS) {
       if (this.byLayer.has(layer)) return { value: this.byLayer.get(layer), layer };
     }
@@ -228,6 +389,7 @@ class Field {
  * @property {string} doi
  * @property {string} isbn
  * @property {string} pdfUrl
+ * @property {string} permalink Adresse genau dieser Fassung (z. B. Wikipedia `oldid=`); leer, wenn unbekannt
  * @property {boolean} pdfSameOrigin
  * @property {string} lang
  * @property {string} accessedAt
@@ -254,7 +416,14 @@ export function harvestMetadata(doc, options = {}) {
 
   const index = indexMetaTags(doc);
   const jsonLdNodes = collectJsonLdNodes(doc);
-  const article = pickJsonLdArticle(jsonLdNodes) || {};
+  const jsonLdIds = indexJsonLdIds(jsonLdNodes);
+  const picked = pickJsonLdArticle(jsonLdNodes) || {};
+  /** @type {Record<string, any>} */
+  const article = { ...picked };
+  for (const key of ['author', 'creator', 'editor', 'publisher', 'isPartOf', 'publication']) {
+    if (article[key]) article[key] = deref(article[key], jsonLdIds);
+  }
+  const website = jsonLdNodes.find((node) => typesOf(node).includes('website'));
 
   const fields = {
     title: new Field(),
@@ -273,10 +442,43 @@ export function harvestMetadata(doc, options = {}) {
     lang: new Field(),
   };
 
+  let host = '';
+  try {
+    host = baseUrl ? new URL(baseUrl).hostname.replace(/^www\./i, '') : '';
+  } catch {
+    host = '';
+  }
+
+  const h1 = doc.querySelector('h1');
+  const heading = collapseWhitespace(h1 ? h1.textContent || '' : '');
+  const siteNames = [
+    ...all(index, ['og:site_name', 'application-name']),
+    website ? schemaName(website) : '',
+    schemaName(article.publisher),
+  ].filter(Boolean);
+  const titleHints = { heading, siteNames, hostNames: hostNameCandidates(host) };
+
+  // ------------------------------------------------------------ 0. Seitenrezept
+  const mediaWiki = harvestMediaWiki(doc, article, baseUrl);
+  if (mediaWiki) {
+    fields.title.set('site', mediaWiki.title);
+    fields.siteName.set('site', mediaWiki.siteName);
+    fields.description.set('site', mediaWiki.description);
+    // Ohne Versionsdatum lieber kein Datum als das Anlagedatum des Artikels.
+    if (mediaWiki.date) fields.date.set('site', mediaWiki.date);
+    else fields.date.block();
+    // Ein Wiki hat keinen Autor im Sinne der Zitierstile.
+    fields.authors.block();
+    // DOI und ISBN im Fliesstext gehoeren zur Literaturliste des Artikels,
+    // nicht zum Artikel — sonst wird jeder Wikipedia-Eintrag zum Buch.
+    fields.doi.block();
+    fields.isbn.block();
+  }
+
   // ---------------------------------------------------------------- 1. Highwire
   fields.title.set('citation', clampLine(first(index, ['citation_title'])));
-  fields.authors.set('citation', parsePeople(all(index, ['citation_author', 'citation_authors'])));
-  fields.editors.set('citation', parsePeople(all(index, ['citation_editor'])));
+  fields.authors.set('citation', harvestPeople(all(index, ['citation_author', 'citation_authors']), siteNames));
+  fields.editors.set('citation', harvestPeople(all(index, ['citation_editor'])));
   fields.containerTitle.set(
     'citation',
     clampLine(
@@ -300,12 +502,13 @@ export function harvestMetadata(doc, options = {}) {
   fields.pdfUrl.set('citation', resolveUrl(first(index, ['citation_pdf_url', 'citation_fulltext_html_url']), baseUrl));
 
   // ---------------------------------------------------------------- 2. JSON-LD
-  fields.title.set('jsonld', clampLine(article.headline || article.name || ''));
-  fields.authors.set('jsonld', parsePeople(article.author ?? article.creator ?? null));
-  fields.editors.set('jsonld', parsePeople(article.editor ?? null));
+  fields.title.set('jsonld', clampLine(completeTitle(collapseWhitespace(article.headline || article.name || ''), heading)));
+  fields.authors.set('jsonld', harvestPeople(article.author ?? article.creator ?? null, siteNames));
+  fields.editors.set('jsonld', harvestPeople(article.editor ?? null));
   fields.date.set('jsonld', normalizeDate(article.datePublished || article.dateCreated || article.dateModified || ''));
   fields.publisher.set('jsonld', clampLine(schemaName(article.publisher)));
-  fields.containerTitle.set('jsonld', clampLine(schemaName(article.isPartOf) || schemaName(article.publication)));
+  fields.containerTitle.set('jsonld', clampLine(containerName(article.isPartOf) || containerName(article.publication)));
+  fields.siteName.set('jsonld', clampLine(website ? schemaName(website) : ''));
   fields.description.set('jsonld', collapseWhitespace(article.description || ''));
   fields.isbn.set('jsonld', extractIsbn(String(article.isbn || '')));
   fields.doi.set(
@@ -319,7 +522,7 @@ export function harvestMetadata(doc, options = {}) {
   fields.title.set('dublincore', clampLine(first(index, ['dc.title', 'dcterms.title'])));
   fields.authors.set(
     'dublincore',
-    parsePeople(all(index, ['dc.creator', 'dcterms.creator', 'dc.contributor.author'])),
+    harvestPeople(all(index, ['dc.creator', 'dcterms.creator', 'dc.contributor.author']), siteNames),
   );
   fields.date.set('dublincore', normalizeDate(first(index, ['dc.date', 'dcterms.date', 'dcterms.issued', 'dc.date.issued'])));
   fields.publisher.set('dublincore', clampLine(first(index, ['dc.publisher', 'dcterms.publisher'])));
@@ -330,13 +533,16 @@ export function harvestMetadata(doc, options = {}) {
   fields.doi.set('dublincore', extractDoi(first(index, ['dc.identifier', 'dcterms.identifier']) || ''));
 
   // -------------------------------------------------------------- 4. OpenGraph
-  fields.title.set('opengraph', clampLine(first(index, ['og:title', 'twitter:title'])));
+  fields.title.set('opengraph', clampLine(completeTitle(
+    stripTitleAffix(first(index, ['og:title', 'twitter:title']) || '', titleHints),
+    heading,
+  )));
   fields.siteName.set('opengraph', clampLine(first(index, ['og:site_name', 'application-name'])));
   fields.date.set(
     'opengraph',
     normalizeDate(first(index, ['article:published_time', 'article:modified_time', 'og:updated_time', 'date'])),
   );
-  fields.authors.set('opengraph', parsePeople(all(index, ['article:author', 'author', 'twitter:creator'])));
+  fields.authors.set('opengraph', harvestPeople(all(index, ['article:author', 'author', 'twitter:creator']), siteNames));
   fields.description.set('opengraph', collapseWhitespace(first(index, ['og:description', 'description']) || ''));
   fields.canonicalUrl.set('opengraph', resolveUrl(first(index, ['og:url']), baseUrl));
 
@@ -344,9 +550,12 @@ export function harvestMetadata(doc, options = {}) {
   const canonicalLink = doc.querySelector('link[rel~="canonical" i]');
   fields.canonicalUrl.set('fallback', resolveUrl(canonicalLink && canonicalLink.getAttribute('href'), baseUrl));
 
-  const h1 = doc.querySelector('h1');
-  const documentTitle = clampLine(doc.title || '');
-  fields.title.set('fallback', documentTitle || clampLine(h1 ? h1.textContent : ''));
+  const documentTitle = collapseWhitespace(doc.title || '');
+  const titleSplit = splitTitleAffix(documentTitle, titleHints);
+  fields.title.set('fallback', clampLine(titleSplit ? titleSplit.head : documentTitle) || clampLine(heading));
+
+  fields.authors.set('fallback', harvestPeople(harvestBylineNames(doc), siteNames));
+  fields.date.set('fallback', normalizeDate(harvestBylineDate(doc)));
 
   const alternatePdf = doc.querySelector('link[rel~="alternate" i][type="application/pdf"]');
   fields.pdfUrl.set('fallback', resolveUrl(alternatePdf && alternatePdf.getAttribute('href'), baseUrl));
@@ -354,12 +563,8 @@ export function harvestMetadata(doc, options = {}) {
   const htmlLang = doc.documentElement && doc.documentElement.getAttribute('lang');
   fields.lang.set('fallback', htmlLang || '');
 
-  let host = '';
-  try {
-    host = baseUrl ? new URL(baseUrl).hostname.replace(/^www\./i, '') : '';
-  } catch {
-    host = '';
-  }
+  // Was vom <title> abfiel, ist der Name der Website — besser als der Host.
+  fields.siteName.set('fallback', clampLine(titleSplit ? titleSplit.site : ''));
   fields.siteName.set('fallback', host);
 
   // ------------------------------------------------------- DOI aus dem Fliesstext
@@ -369,7 +574,8 @@ export function harvestMetadata(doc, options = {}) {
     if (textDoi) fields.doi.set('fallback', textDoi);
   }
   if (!fields.isbn.resolve()) {
-    const textIsbn = extractIsbn(doc.body ? doc.body.textContent || '' : '');
+    // Im Fliesstext nur mit ausdruecklichem „ISBN" davor.
+    const textIsbn = extractIsbn(doc.body ? doc.body.textContent || '' : '', { requireLabel: true });
     if (textIsbn) fields.isbn.set('fallback', textIsbn);
   }
 
@@ -433,12 +639,53 @@ export function harvestMetadata(doc, options = {}) {
     isbn,
     pdfUrl,
     pdfSameOrigin,
+    permalink: mediaWiki ? mediaWiki.permalink : '',
     lang: (lang || '').slice(0, 16),
     accessedAt: isoDate(options.now || new Date()),
     cslType,
     description,
     provenance,
   };
+}
+
+/**
+ * Die Hauptueberschrift ist der Titel, den Leserinnen sehen und zitieren.
+ * Metadaten weichen davon auf zwei Arten ab, und in beiden gilt die `<h1>`:
+ *
+ *  - Die Dachzeile fehlt: `og:title` „Im Gleichschritt der Cowboystiefel"
+ *    statt „Breakpoint: Im Gleichschritt der Cowboystiefel" (netzpolitik.org).
+ *  - Eine eigene SEO-Fassung nach demselben Stichwort: JSON-LD „Die Geschichte
+ *    der Huthi: Von einer Protestbewegung zum globalen Machtfaktor", gedruckt
+ *    „Die Geschichte der Huthi: Wie aus einer lokalen Protestbewegung ein
+ *    geopolitischer Machtfaktor wurde" (nzz.ch).
+ *
+ * Sonst bleibt der Metadaten-Titel: eine `<h1>`, die nichts mit ihm teilt,
+ * ist oft das Logo oder der Name einer Rubrik.
+ *
+ * @param {string} title
+ * @param {string} heading
+ * @returns {string}
+ */
+function completeTitle(title, heading) {
+  if (!title || !heading) return title;
+  if (heading.length > Math.max(title.length * 2 + 20, 300)) return title;
+  const fold = (/** @type {string} */ value) => value.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+  const foldedHeading = fold(heading);
+  const foldedTitle = fold(title);
+  if (!foldedTitle || foldedHeading === foldedTitle) return title;
+
+  if (heading.length > title.length && (foldedHeading.endsWith(foldedTitle) || foldedHeading.startsWith(foldedTitle))) {
+    return heading;
+  }
+
+  // Gleiches Stichwort vor dem Doppelpunkt, mindestens zwei Woerter.
+  const kicker = (/** @type {string} */ value) => {
+    const index = value.indexOf(':');
+    return index > 0 ? fold(value.slice(0, index)) : '';
+  };
+  const titleKicker = kicker(title);
+  if (titleKicker && titleKicker.includes(' ') && titleKicker === kicker(heading)) return heading;
+  return title;
 }
 
 /**

@@ -174,6 +174,20 @@ describe('intentFromHarvest', () => {
     ]);
   });
 
+  it('haengt den Permalink einer Wiki-Fassung an, zitiert aber die kanonische Adresse', () => {
+    const intent = intentFromHarvest({
+      meta: {
+        url: 'https://de.wikipedia.org/wiki/Fallstadter_Seeufer',
+        normalizedUrl: 'https://de.wikipedia.org/wiki/Fallstadter_Seeufer',
+        permalink: 'https://de.wikipedia.org/w/index.php?title=Fallstadter_Seeufer&oldid=245001337',
+      },
+    }, {});
+    assert.deepEqual(intent.urls, [
+      { url: 'https://de.wikipedia.org/w/index.php?title=Fallstadter_Seeufer&oldid=245001337', label: 'permalink' },
+    ]);
+    assert.equal(intent.source.url, 'https://de.wikipedia.org/wiki/Fallstadter_Seeufer');
+  });
+
   it('faellt bei unbekanntem Modus auf `research` zurueck', async () => {
     const doc = await loadFixture('bare.html', 'https://example.org/x');
     const intent = intentFromHarvest(harvestLike(doc, 'https://example.org/x'), { mode: 'quatsch' });

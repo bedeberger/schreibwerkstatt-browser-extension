@@ -283,7 +283,8 @@ function showProvenance(provenance, bylineHint) {
   /** @type {string[]} */
   const parts = [];
 
-  if (layers.has('citation')) parts.push(t('provenance_citation'));
+  if (layers.has('site')) parts.push(t('provenance_site'));
+  else if (layers.has('citation')) parts.push(t('provenance_citation'));
   else if (layers.has('jsonld')) parts.push(t('provenance_jsonld'));
   else if (layers.has('dublincore')) parts.push(t('provenance_dublincore'));
   else if (layers.has('opengraph')) parts.push(t('provenance_opengraph'));

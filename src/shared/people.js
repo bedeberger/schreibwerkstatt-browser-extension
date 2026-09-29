@@ -93,7 +93,9 @@ export function parsePerson(raw) {
     if (typeof obj.literal === 'string' && collapse(obj.literal)) {
       return { literal: collapse(obj.literal) };
     }
-    const name = obj.name ?? obj['@id'] ?? '';
+    // Ein `@id` ist ein Verweis, kein Name — ausser er sieht nach einem aus.
+    const id = typeof obj['@id'] === 'string' && !/[#/:]/.test(obj['@id']) ? obj['@id'] : '';
+    const name = obj.name ?? id;
     return parsePerson(typeof name === 'string' ? name : '');
   }
 

@@ -128,16 +128,46 @@ export function extractDoi(value) {
 
 /**
  * ISBN aus Text ziehen und normalisieren (ohne Bindestriche).
+ *
+ * Nur Kandidaten mit gueltiger Pruefziffer zaehlen — sonst ist jede
+ * zehnstellige Zahl eine ISBN: Zeitstempel, Artikel-IDs, Telefonnummern.
+ *
  * @param {unknown} value
+ * @param {object} [options]
+ * @param {boolean} [options.requireLabel] nur Treffer mit vorangestelltem „ISBN" —
+ *   fuer Fliesstext, wo eine nackte Ziffernfolge fast nie eine ISBN ist
  * @returns {string|null}
  */
-export function extractIsbn(value) {
+export function extractIsbn(value, options = {}) {
   if (typeof value !== 'string' || !value) return null;
-  const match = value.match(/\b(?:ISBN(?:-1[03])?:?\s*)?((?:97[89][-\s]?)?(?:\d[-\s]?){9}[\dXx])\b/);
-  if (!match) return null;
-  const digits = match[1].replace(/[-\s]/g, '').toUpperCase();
-  if (digits.length !== 10 && digits.length !== 13) return null;
-  return digits;
+  const pattern = /\b(ISBN(?:-1[03])?:?\s*)?((?:97[89][-\s]?)?(?:\d[-\s]?){9}[\dXx])\b/gi;
+  for (const match of value.matchAll(pattern)) {
+    if (options.requireLabel && !match[1]) continue;
+    const digits = match[2].replace(/[-\s]/g, '').toUpperCase();
+    if (isValidIsbn(digits)) return digits;
+  }
+  return null;
+}
+
+/**
+ * @param {string} digits ohne Trenner
+ * @returns {boolean}
+ */
+export function isValidIsbn(digits) {
+  if (/^\d{9}[\dX]$/.test(digits)) {
+    let sum = 0;
+    for (let i = 0; i < 10; i += 1) {
+      const digit = digits[i] === 'X' ? 10 : Number(digits[i]);
+      sum += digit * (10 - i);
+    }
+    return sum % 11 === 0;
+  }
+  if (/^97[89]\d{10}$/.test(digits)) {
+    let sum = 0;
+    for (let i = 0; i < 13; i += 1) sum += Number(digits[i]) * (i % 2 === 0 ? 1 : 3);
+    return sum % 10 === 0;
+  }
+  return false;
 }
 
 /**

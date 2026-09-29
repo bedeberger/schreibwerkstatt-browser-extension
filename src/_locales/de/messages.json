@@ -533,6 +533,9 @@
   "popup_queue_chip": {
     "message": "$1 in Warteschlange"
   },
+  "provenance_site": {
+    "message": "Wiki-Seite erkannt – Titel, Stand und Permalink aus der Seitenstruktur"
+  },
   "provenance_citation": {
     "message": "Angaben aus citation_*-Metadaten (verlagsseitig)"
   },

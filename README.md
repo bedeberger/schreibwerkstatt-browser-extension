@@ -293,7 +293,7 @@ Alles läuft mit `node:test`, ohne Netz und ohne echten Server.
 
 | Datei | Prüft |
 |---|---|
-| `test/harvest.test.js` | Metadaten-Ernte gegen fünf HTML-Fixtures: Wissenschaftsverlag mit `citation_*`, Nachrichtenseite mit JSON-LD im `@graph`, Blog nur mit OpenGraph, nackte Seite ohne Metadaten, Dublin Core. Prüft insbesondere die **Prioritätsreihenfolge** — dass `citation_title` gegen ein gleichzeitig vorhandenes `og:title` gewinnt. |
+| `test/harvest.test.js` | Metadaten-Ernte gegen zehn HTML-Fixtures: Wissenschaftsverlag mit `citation_*`, Nachrichtenseite mit JSON-LD im `@graph`, Blog nur mit OpenGraph, nackte Seite ohne Metadaten, Dublin Core, erfundener Wikipedia-Artikel, WordPress ohne SEO-Plugin, HubSpot-Blog mit `@id`-Verweisen, Tageszeitung mit SEO-Titel und Platzhalter-Autor, Magazin mit Entities im JSON-LD und CSS-Modul-Byline. Dazu das Abtrennen von Site-Namen am Titel. Prüft insbesondere die **Prioritätsreihenfolge** — dass `citation_title` gegen ein gleichzeitig vorhandenes `og:title` gewinnt. |
 | `test/people.test.js` | Personen-Parsing: „Nachname, Vorname“, „Vorname Nachname“, Partikel (`van der Meer`), Versalien-Konvention, Titel, Suffixe, Körperschaften, Listen — und dass im Zweifel `{ literal }` herauskommt. |
 | `test/url.test.js` | URL-Normalisierung, Tracking-Parameter, Server-URL, Origin-Muster. |
 | `test/text.test.js` | Kürzen an Satzgrenzen, DOI-/ISBN-/Jahr-Extraktion, Datumsformate. |
@@ -344,15 +344,83 @@ Datei, die Chrome-Ereignisse verdrahtet.
 
 ### Prioritätsreihenfolge der Ernte
 
+0. Seitenrezept für **MediaWiki** (Wikipedia und andere Wikis) — siehe unten
 1. Highwire / `citation_*` — was Verlage und Google Scholar liefern
 2. JSON-LD, `schema.org/Article` und Verwandte (auch im `@graph`)
 3. Dublin Core
 4. OpenGraph / `article:*`
-5. Fallback: `<title>`, `<link rel=canonical>`, erstes `<h1>`
+5. Fallback: `<title>`, `<link rel=canonical>`, erstes `<h1>`, Autorenzeile und
+   `<time datetime>` aus dem Markup (siehe unten)
 
 Jedes Feld wird einzeln aufgelöst und merkt sich seine Herkunft; das Popup zeigt
 sie an. Findet sich in keiner Schicht ein DOI, wird zusätzlich der Seitentext per
-Regex durchsucht.
+Regex durchsucht. Eine ISBN zählt im Seitentext nur mit vorangestelltem „ISBN“
+und gültiger Prüfziffer — sonst wären Zeitstempel und Beitragsnummern Bücher,
+und jede elfte zufällige Zahl hat eine gültige ISBN-10-Prüfziffer.
+
+JSON-LD-Verweise per `@id` werden im `@graph` aufgelöst; Yoast (WordPress) und
+HubSpot legen Autor, Verlag und Website nur so ab. Der Knoten `WebSite` liefert
+den Namen der Website; ein `isPartOf`, das auf die eigene `WebPage` zeigt, ist
+kein Container.
+
+Titel aus OpenGraph und `<title>` verlieren einen angehängten Site-Namen
+(„… – Abendpost“, „… | Kestrel Notes“), aber nur, wenn er sich belegen lässt:
+der Rest gleicht der `<h1>`, oder das abgetrennte Stück gleicht `og:site_name`,
+dem Verlag aus JSON-LD oder exakt einem Label des Hostnamens. Der Doppelpunkt
+trennt nie — er leitet Untertitel ein.
+
+Die `<h1>` ist der Titel, den Leser:innen sehen und zitieren. Sie gewinnt gegen
+`og:title` und JSON-LD `headline`, wenn diese ihr die Dachzeile abschneiden
+(„Breakpoint: …“) oder eine eigene SEO-Fassung nach demselben Stichwort vor dem
+Doppelpunkt sind (nzz.ch: „Die Geschichte der Huthi: Von einer …“ gegen gedruckt
+„Die Geschichte der Huthi: Wie aus einer …“). Teilt die `<h1>` nichts mit dem
+Metadaten-Titel — oft ist sie das Logo —, bleibt er.
+
+HTML-Entities in JSON-LD (`&ldquo;` bei hbr.org) werden dekodiert.
+
+### Autor:innen bei Zeitungen und Magazinen
+
+Aus jeder Schicht fallen heraus: Profil-URLs, Handles, E-Mail-Adressen, die
+Zeitung als ihr eigener Autor („The Economist“ bei The Economist, der
+anonym nach Hausstil schreibt) und Platzhalter im Plural („Auswärtige Autoren
+NZZ“, „Contributors“, „Agenturen“). Bleibt nichts übrig, kommt die nächste
+Schicht zum Zug — bei der NZZ `<meta name="author">`. Eine benannte Redaktion
+(„Redaktion Beispiel-Zeitung“) bleibt als Körperschaft stehen.
+
+Ein `isPartOf` vom Typ `Product` ist Googles Paywall-Markup, nicht die
+Publikation, und macht keinen Beitrag zum Zeitschriftenartikel.
+
+### Blogs ohne Autor in den Metadaten
+
+WordPress ohne SEO-Plugin und viele HubSpot-Themes nennen die Autorin nur im
+Beitragskopf. Die Fallback-Schicht liest dort gezielt markierte Stellen: den
+Core-Block `.wp-block-post-author-name`, Microdata und Microformats
+(`itemprop=author`, `.author.vcard`, `.h-entry .p-author`), klassische Themes
+(`.byline .author`, `.entry-author`), HubSpot (`.blog-post__author-name`,
+`.hs-author-name`), zuletzt jede Klasse, die auf `author-name` endet, Kinder auf
+`…author` in einem Element auf `…byline` (CSS-Module, etwa hbr.org), und
+`rel=author`. Kommentare, verwandte Beiträge, Karten, Seitenleisten und Fußzeilen
+sind ausgenommen; Einleitungen wie „von“ und „Written by:“ fallen weg; Einträge
+mit Ziffern oder URLs zählen nicht. Genauso das Datum aus `<time datetime>` im
+Beitrag. Jede Meta-Angabe schlägt diese Schicht.
+
+### Wikipedia und andere MediaWiki-Seiten
+
+Erkannt am `<meta name="generator" content="MediaWiki …">` zusammen mit
+`h1#firstHeading`. Die allgemeinen Metadaten führen dort nachweislich in die Irre,
+deshalb gilt die Seitenstruktur:
+
+| Feld | Quelle | statt |
+|---|---|---|
+| Titel | `h1#firstHeading` (auch kursive Anzeigetitel) | JSON-LD `headline` — das ist die Wikidata-Kurzbeschreibung |
+| Jahr | JSON-LD `dateModified`, sonst `#footer-info-lastmod` — der Stand der gelesenen Fassung | `datePublished`, die Anlage des Artikels; ohne Stand bleibt das Jahr leer |
+| Autor:innen | keine — Zitierstile setzen bei Wikipedia keinen Autor | „Autoren der Wikimedia-Projekte“ |
+| Website/Container | Name aus dem `<title>` („Wikipedia“, „Wikipédia“) | — |
+| DOI/ISBN | keine | Treffer aus der Literaturliste, die jeden Artikel zum Buch machten |
+| Permalink | `#t-permalink` (`oldid=`), als `urls[]`-Eintrag `permalink` | — |
+
+Als Quelle zählt weiter die kanonische Adresse, damit die Dublettenprüfung greift;
+der Permalink hält fest, welche Fassung gelesen wurde.
 
 ### Personen
 

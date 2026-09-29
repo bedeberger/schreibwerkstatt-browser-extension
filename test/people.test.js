@@ -185,3 +185,9 @@ describe('Rueckwandlung', () => {
     assert.equal(formatPeople(parsePeople(input)), input);
   });
 });
+
+describe('JSON-LD-Verweise', () => {
+  it('macht aus einem unaufgeloesten @id-Verweis keinen Namen', () => {
+    assert.deepEqual(parsePeople({ '@type': 'Person', '@id': 'https://blog.example.com/#/schema/person/4711' }), []);
+  });
+});

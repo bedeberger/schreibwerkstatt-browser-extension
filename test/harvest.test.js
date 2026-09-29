@@ -6,6 +6,9 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import { guessCslType, harvestMetadata } from '../src/content/extract-meta.js';
+import { splitTitleAffix, stripTitleAffix } from '../src/content/title-affix.js';
+import { harvestBylineNames } from '../src/content/byline.js';
+import { JSDOM } from 'jsdom';
 import { loadFixture } from './helpers/dom.js';
 
 const FIXED_NOW = new Date(2026, 6, 31); // 2026-07-31, lokale Zeit
@@ -208,6 +211,317 @@ describe('Ernte: Dublin Core', () => {
   });
 });
 
+describe('Ernte: Wikipedia (MediaWiki)', () => {
+  const url = 'https://de.wikipedia.org/wiki/Fallstadter_Seeufer';
+  /** @type {any} */
+  let meta;
+
+  it('liest die Fixture', async () => {
+    const doc = await loadFixture('mediawiki.html', url);
+    meta = harvestMetadata(doc, { url, now: FIXED_NOW });
+  });
+
+  it('nimmt den Titel aus h1#firstHeading, nicht die Kurzbeschreibung aus JSON-LD headline', () => {
+    assert.equal(meta.title, 'Fallstadter Seeufer');
+    assert.equal(meta.provenance.title, 'site');
+    assert.equal(meta.description, 'Uferabschnitt am Fallstadter See, Schweiz');
+  });
+
+  it('nimmt den Stand der Version, nicht das Anlagedatum des Artikels', () => {
+    // Ohne dateModified im JSON-LD bleibt der Fusszeilen-Stand; sein Monat
+    // ist lokalisiert, das Jahr genuegt der Quelle.
+    assert.equal(meta.year, 2026);
+    assert.equal(meta.provenance.date, 'site');
+  });
+
+  it('setzt keinen Autor — auch nicht die Koerperschaft aus JSON-LD', () => {
+    assert.deepEqual(meta.authors, []);
+    assert.equal(meta.provenance.authors, undefined);
+  });
+
+  it('macht den Artikel nicht wegen der Literaturliste zum Buch', () => {
+    assert.equal(meta.isbn, '');
+    assert.equal(meta.doi, '');
+    assert.equal(meta.cslType, 'website');
+  });
+
+  it('nennt Wikipedia als Website und Container, die Foundation als Verlag', () => {
+    assert.equal(meta.siteName, 'Wikipedia');
+    assert.equal(meta.containerTitle, 'Wikipedia');
+    assert.equal(meta.publisher, 'Wikimedia Foundation, Inc.');
+  });
+
+  it('liefert den Permalink der gelesenen Fassung, zitiert aber kanonisch', () => {
+    assert.equal(meta.permalink, 'https://de.wikipedia.org/w/index.php?title=Fallstadter_Seeufer&oldid=245001337');
+    assert.equal(meta.normalizedUrl, 'https://de.wikipedia.org/wiki/Fallstadter_Seeufer');
+  });
+
+  it('bevorzugt dateModified aus JSON-LD, wenn es da ist', async () => {
+    const doc = await loadFixture('mediawiki.html', url);
+    const script = /** @type {Element} */ (doc.querySelector('script[type="application/ld+json"]'));
+    const node = JSON.parse(script.textContent || '');
+    node.dateModified = '2025-12-30T08:00:00Z';
+    script.textContent = JSON.stringify(node);
+    assert.equal(harvestMetadata(doc, { url, now: FIXED_NOW }).publishedDate, '2025-12-30');
+  });
+
+  it('laesst das Datum leer statt das Anlagedatum zu nehmen, wenn kein Stand da ist', async () => {
+    const doc = await loadFixture('mediawiki.html', url);
+    doc.getElementById('footer-info-lastmod')?.remove();
+    const bare = harvestMetadata(doc, { url, now: FIXED_NOW });
+    assert.equal(bare.publishedDate, '');
+    assert.equal(bare.year, null);
+  });
+
+  it('loest den Permalink der Mobilansicht auf die Desktop-Adresse auf', async () => {
+    const mobile = 'https://de.m.wikipedia.org/wiki/Fallstadter_Seeufer';
+    const doc = await loadFixture('mediawiki.html', mobile);
+    const m = harvestMetadata(doc, { url: mobile, now: FIXED_NOW });
+    assert.equal(m.permalink, 'https://de.wikipedia.org/w/index.php?title=Fallstadter_Seeufer&oldid=245001337');
+  });
+
+  it('nimmt einen kursiven Anzeigetitel als Klartext', async () => {
+    const doc = await loadFixture('mediawiki.html', url);
+    const h1 = /** @type {Element} */ (doc.getElementById('firstHeading'));
+    h1.innerHTML = '<i>Ufer und Stadt</i> (Buch)';
+    doc.title = 'Ufer und Stadt (Buch) – Wikipedia';
+    const m = harvestMetadata(doc, { url, now: FIXED_NOW });
+    assert.equal(m.title, 'Ufer und Stadt (Buch)');
+    assert.equal(m.siteName, 'Wikipedia');
+  });
+
+  it('greift ohne MediaWiki-Generator nicht', async () => {
+    const doc = await loadFixture('mediawiki.html', url);
+    doc.querySelector('meta[name="generator"]')?.remove();
+    const m = harvestMetadata(doc, { url, now: FIXED_NOW });
+    assert.notEqual(m.provenance.title, 'site');
+    assert.equal(m.permalink, '');
+  });
+});
+
+describe('Ernte: WordPress ohne SEO-Plugin', () => {
+  const url = 'https://kestrel.example.net/2025/03/seeufer/';
+  /** @type {any} */
+  let meta;
+
+  it('liest die Fixture', async () => {
+    const doc = await loadFixture('wordpress.html', url);
+    meta = harvestMetadata(doc, { url, now: FIXED_NOW });
+  });
+
+  it('nimmt die Ueberschrift mit Dachzeile, wenn og:title sie weglaesst', () => {
+    assert.equal(meta.title, 'Querbau: Warum das Seeufer nicht fertig wird');
+    assert.equal(meta.provenance.title, 'opengraph');
+  });
+
+  it('liest die Autorin aus dem Post-Author-Block, nicht aus Kommentar oder verwandten Beitraegen', () => {
+    assert.deepEqual(meta.authors, [{ family: 'Raghunathan', given: 'Priya' }]);
+    assert.equal(meta.provenance.authors, 'fallback');
+  });
+
+  it('datiert nach dem Beitrag, nicht nach dem Kommentar', () => {
+    assert.equal(meta.publishedDate, '2025-03-14');
+    assert.equal(meta.provenance.date, 'fallback');
+  });
+
+  it('haelt eine Beitragsnummer im Text nicht fuer eine ISBN', () => {
+    assert.equal(meta.isbn, '');
+    assert.equal(meta.cslType, 'website');
+    assert.equal(meta.containerTitle, 'Kestrel Notes');
+  });
+});
+
+describe('Ernte: HubSpot-Blog mit @id-Verweisen im JSON-LD', () => {
+  const url = 'https://blog.abendpost.example.ch/seeufer-planung';
+  /** @type {any} */
+  let meta;
+
+  it('liest die Fixture', async () => {
+    const doc = await loadFixture('hubspot.html', url);
+    meta = harvestMetadata(doc, { url, now: FIXED_NOW });
+  });
+
+  it('loest den Autor-Verweis auf den Person-Knoten auf', () => {
+    assert.deepEqual(meta.authors, [{ family: 'Stauffer', given: 'Miriam' }]);
+    assert.equal(meta.provenance.authors, 'jsonld');
+  });
+
+  it('loest den Verlag auf, statt die @id-Adresse einzutragen', () => {
+    assert.equal(meta.publisher, 'Abendpost Verlag AG');
+  });
+
+  it('nimmt den WebSite-Knoten als Website-Namen und die eigene WebPage nicht als Container', () => {
+    assert.equal(meta.siteName, 'Abendpost Blog');
+    assert.equal(meta.containerTitle, 'Abendpost Blog');
+    assert.equal(meta.cslType, 'website');
+  });
+
+  it('haelt eine Nummer mit zufaellig gueltiger Pruefziffer nicht fuer eine ISBN', () => {
+    assert.equal(meta.isbn, '');
+  });
+
+  it('liest die HubSpot-Autorenzeile ohne „von", wenn JSON-LD keinen Autor nennt', async () => {
+    const doc = await loadFixture('hubspot.html', url);
+    doc.querySelector('script[type="application/ld+json"]')?.remove();
+    const m = harvestMetadata(doc, { url, now: FIXED_NOW });
+    assert.deepEqual(m.authors, [{ family: 'Dubois', given: 'Léon' }]);
+  });
+});
+
+describe('Ernte: Tageszeitung mit SEO-Titel und Platzhalter-Autor', () => {
+  const url = 'https://www.abendpost.example.ch/stadt/seeufer-ld.10025303';
+  /** @type {any} */
+  let meta;
+
+  it('liest die Fixture', async () => {
+    const doc = await loadFixture('newspaper.html', url);
+    meta = harvestMetadata(doc, { url, now: FIXED_NOW });
+  });
+
+  it('nimmt die gedruckte Ueberschrift statt der SEO-Fassung mit gleichem Stichwort', () => {
+    assert.equal(meta.title, 'Das Fallstadter Seeufer: Warum die Stadt seit elf Jahren plant und nie baut');
+    assert.equal(meta.provenance.title, 'jsonld');
+  });
+
+  it('ueberspringt den Platzhalter im JSON-LD und nimmt meta[name=author]', () => {
+    assert.deepEqual(meta.authors, [{ family: 'Stauffer', given: 'Miriam' }]);
+    assert.equal(meta.provenance.authors, 'opengraph');
+  });
+
+  it('haelt das Paywall-Produkt nicht fuer die Zeitschrift', () => {
+    assert.equal(meta.cslType, 'website');
+    assert.equal(meta.containerTitle, 'Abendpost');
+  });
+
+  it('laesst den Metadaten-Titel stehen, wenn die h1 nichts mit ihm teilt', async () => {
+    const doc = await loadFixture('newspaper.html', url);
+    doc.querySelector('article h1')?.remove();
+    doc.querySelector('header')?.insertAdjacentHTML('afterbegin', '<h1>Abendpost</h1>');
+    assert.equal(harvestMetadata(doc, { url, now: FIXED_NOW }).title, 'Das Fallstadter Seeufer: Planung ohne Ende');
+  });
+
+  it('setzt keine Zeitung als ihren eigenen Autor', async () => {
+    // Wie beim Economist: anonym nach Hausstil, author = publisher.
+    const doc = await loadFixture('newspaper.html', url);
+    doc.querySelector('meta[name="author"]')?.remove();
+    const script = /** @type {Element} */ (doc.querySelector('script[type="application/ld+json"]'));
+    const node = JSON.parse(script.textContent || '');
+    node.author = { '@type': 'NewsMediaOrganization', name: 'Abendpost' };
+    script.textContent = JSON.stringify(node);
+    assert.deepEqual(harvestMetadata(doc, { url, now: FIXED_NOW }).authors, []);
+  });
+
+  it('behaelt eine benannte Redaktion als Koerperschaft', async () => {
+    const doc = await loadFixture('newspaper.html', url);
+    doc.querySelector('meta[name="author"]')?.remove();
+    const script = /** @type {Element} */ (doc.querySelector('script[type="application/ld+json"]'));
+    const node = JSON.parse(script.textContent || '');
+    node.author = { '@type': 'Organization', name: 'Redaktion Abendpost Stadt' };
+    script.textContent = JSON.stringify(node);
+    assert.deepEqual(harvestMetadata(doc, { url, now: FIXED_NOW }).authors, [{ literal: 'Redaktion Abendpost Stadt' }]);
+  });
+});
+
+describe('Ernte: Magazin mit Entities im JSON-LD und CSS-Modul-Byline', () => {
+  const url = 'https://nbr.example.org/2026/01/why-teams-stop-collaborating';
+  /** @type {any} */
+  let meta;
+
+  it('liest die Fixture', async () => {
+    const doc = await loadFixture('magazine.html', url);
+    meta = harvestMetadata(doc, { url, now: FIXED_NOW });
+  });
+
+  it('dekodiert HTML-Entities aus JSON-LD', () => {
+    assert.equal(meta.title, 'Why Teams Stop “Collaborating”—and What Helps');
+    assert.equal(meta.description, 'It isn’t the tools. It’s the mandate.');
+  });
+
+  it('liest die Autor:innen aus der Byline, nicht doppelt aus dem Bio-Kasten', () => {
+    assert.deepEqual(meta.authors, [
+      { family: 'Halvorsen', given: 'Ingrid' },
+      { family: 'Okonkwo', given: 'Chidi' },
+    ]);
+    assert.equal(meta.provenance.authors, 'fallback');
+  });
+});
+
+describe('Autorenzeile aus dem Markup', () => {
+  /** @param {string} body */
+  const names = (body) => harvestBylineNames(new JSDOM(`<body>${body}</body>`).window.document);
+
+  it('verlangt beim allgemeinen Selektor, dass die Klasse auf author-name endet', () => {
+    // netzpolitik.org: der Kasten enthaelt Name UND Datum.
+    assert.deepEqual(names('<div class="np-intro-author-name-dates">Carla Siepmann 27. September 2026</div>'), []);
+    assert.deepEqual(names('<div class="blog-hero-1__author-name">von Tobias Ellenberger</div>'), ['Tobias Ellenberger']);
+  });
+
+  it('streicht Einleitungen wie „Written by:"', () => {
+    assert.deepEqual(names('<span class="hs-author-name">Written by: Priya Raghunathan</span>'), ['Priya Raghunathan']);
+  });
+
+  it('nimmt keine URL und keinen Biografie-Kasten', () => {
+    assert.deepEqual(names('<a rel="author">https://kestrel.example.net/author/priya/</a>'), []);
+    assert.deepEqual(names(`<div class="entry-author">${'Sehr lange Biografie '.repeat(10)}</div>`), []);
+  });
+
+  it('sammelt mehrere Autor:innen desselben Selektors', () => {
+    assert.deepEqual(
+      names('<span class="wp-block-post-author-name">Miriam Stauffer</span><span class="wp-block-post-author-name">Léon Dubois</span>'),
+      ['Miriam Stauffer', 'Léon Dubois'],
+    );
+  });
+});
+
+describe('Site-Namen am Titel', () => {
+  it('schneidet og:title und <title> ab, wenn der Rest der Ueberschrift gleicht', async () => {
+    const url = 'https://kestrel.example.net/posts/standing-desk';
+    const doc = await loadFixture('blog-og.html', url);
+    doc.querySelector('meta[property="og:title"]')?.remove();
+    const meta = harvestMetadata(doc, { url, now: FIXED_NOW });
+    assert.equal(meta.title, 'Why I stopped using a standing desk');
+  });
+
+  it('trennt per Ueberschrift, auch ohne bekannten Site-Namen', () => {
+    assert.deepEqual(splitTitleAffix('Seeufer-Entscheid – Abendpost', { heading: 'Seeufer-Entscheid' }), {
+      head: 'Seeufer-Entscheid',
+      site: 'Abendpost',
+    });
+  });
+
+  it('trennt per bekanntem Site-Namen, auch als Anfangsstueck', () => {
+    assert.equal(
+      stripTitleAffix('Sediment transport | Journal of Fluvial Studies', {
+        siteNames: ['Journal of Fluvial Studies Online'],
+      }),
+      'Sediment transport',
+    );
+  });
+
+  it('erkennt den Site-Namen vorne', () => {
+    assert.equal(stripTitleAffix('Abendpost | Seeufer-Entscheid', { siteNames: ['Abendpost'] }), 'Seeufer-Entscheid');
+  });
+
+  it('nimmt Host-Labels nur exakt', () => {
+    assert.equal(stripTitleAffix('Seeufer – Abendpost', { hostNames: ['abendpost', 'example'] }), 'Seeufer');
+    assert.equal(
+      stripTitleAffix('Repositorium – Eintrag 88421', { hostNames: ['repo', 'example'] }),
+      'Repositorium – Eintrag 88421',
+    );
+  });
+
+  it('laesst einen Gedankenstrich im Werktitel stehen', () => {
+    assert.equal(
+      stripTitleAffix('Krieg und Frieden – eine Relektüre', { heading: 'Lesenotizen', siteNames: ['Kestrel Notes'] }),
+      'Krieg und Frieden – eine Relektüre',
+    );
+  });
+
+  it('trennt nie am Doppelpunkt', () => {
+    assert.equal(stripTitleAffix('Abendpost: Seeufer', { siteNames: ['Abendpost'] }), 'Abendpost: Seeufer');
+  });
+});
+
 describe('DOI aus dem Fliesstext', () => {
   it('greift nur, wenn keine Meta-Angabe existiert', async () => {
     const url = 'https://example.org/paper';
@@ -236,5 +550,46 @@ describe('guessCslType', () => {
 
   it('ohne Anhaltspunkt: website', () => {
     assert.equal(guessCslType({}), 'website');
+  });
+});
+
+describe('Ernte: Profil-URL, Handle und E-Mail sind keine Personen', () => {
+  const url = 'https://schreibwerkstatt.example.com/blog/beitrag';
+
+  /** @param {string} head */
+  async function harvest(head) {
+    const { JSDOM } = await import('jsdom');
+    const html = `<!doctype html><html><head><title>Beitrag</title>${head}</head><body></body></html>`;
+    const doc = new JSDOM(html, { url, contentType: 'text/html' }).window.document;
+    return harvestMetadata(doc, { url, now: FIXED_NOW });
+  }
+
+  it('wirft die Profil-URL aus article:author, behaelt den Namen aus author', async () => {
+    const meta = await harvest(`
+      <meta property="article:author" content="https://www.facebook.com/redaktion.beispiel" />
+      <meta name="author" content="Priya Raghunathan" />`);
+    assert.deepEqual(meta.authors, [{ family: 'Raghunathan', given: 'Priya' }]);
+  });
+
+  it('wirft Handle und E-Mail-Adresse', async () => {
+    const meta = await harvest(`
+      <meta name="twitter:creator" content="@redaktion_beispiel" />
+      <meta name="author" content="redaktion@schreibwerkstatt.example.com" />
+      <meta name="author" content="www.schreibwerkstatt.example.com/team/priya" />`);
+    assert.deepEqual(meta.authors, []);
+    assert.equal(meta.provenance.authors, undefined);
+  });
+
+  it('bleibt nur eine URL, kommt die naechste Schicht zum Zug', async () => {
+    const meta = await harvest(`
+      <meta name="citation_author" content="https://orcid.org/0000-0002-1825-0097" />
+      <meta name="DC.creator" content="Halvorsen, Ingrid M." />`);
+    assert.deepEqual(meta.authors, [{ family: 'Halvorsen', given: 'Ingrid M.' }]);
+    assert.equal(meta.provenance.authors, 'dublincore');
+  });
+
+  it('laesst Koerperschaften und Namen mit Sonderzeichen stehen', async () => {
+    const meta = await harvest(`<meta name="author" content="Redaktion Beispiel-Zeitung" />`);
+    assert.equal(meta.authors.length, 1);
   });
 });

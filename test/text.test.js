@@ -101,6 +101,26 @@ describe('extractIsbn', () => {
     assert.equal(extractIsbn('3-16-148410-X'), '316148410X');
   });
 
+  it('verwirft Ziffernfolgen ohne gueltige Pruefziffer', () => {
+    // Zeitstempel und Artikel-IDs aus echten Blogseiten.
+    assert.equal(extractIsbn('2026091202'), null);
+    assert.equal(extractIsbn('id 5567151590'), null);
+    assert.equal(extractIsbn('ISBN 978-3-16-148410-1'), null);
+  });
+
+  it('nimmt den ersten gueltigen Kandidaten', () => {
+    assert.equal(extractIsbn('Post 2026091202, ISBN 978-3-16-148410-0'), '9783161484100');
+  });
+
+  it('verlangt auf Wunsch das Wort ISBN', () => {
+    // Jede elfte Zufallszahl hat eine gueltige ISBN-10-Pruefziffer — die
+    // Pruefziffer allein haelt eine Artikel-ID nicht auf, das Wort schon.
+    assert.equal(extractIsbn('post-1785805606'), '1785805606');
+    assert.equal(extractIsbn('post-1785805606', { requireLabel: true }), null);
+    assert.equal(extractIsbn('Bestellnr. 3-16-148410-X', { requireLabel: true }), null);
+    assert.equal(extractIsbn('ISBN-10: 3-16-148410-X', { requireLabel: true }), '316148410X');
+  });
+
   it('ignoriert zu kurze Zahlen', () => {
     assert.equal(extractIsbn('12345'), null);
     assert.equal(extractIsbn(''), null);

@@ -52,6 +52,12 @@ export function intentFromHarvest(harvested, options = {}) {
   if (meta.canonicalUrl && !sameServerResource(meta.canonicalUrl, normalizedUrl)) {
     urls.push({ url: meta.canonicalUrl, label: 'canonical' });
   }
+  // Die gelesene Fassung (Wikipedia `oldid=`). Als Quelle zaehlt weiter die
+  // kanonische Adresse — sonst waere jede Bearbeitung eine neue Quelle und die
+  // Dublettenpruefung liefe ins Leere.
+  if (meta.permalink && !sameServerResource(meta.permalink, normalizedUrl)) {
+    urls.push({ url: meta.permalink, label: 'permalink' });
+  }
   if (meta.pdfUrl) urls.push({ url: meta.pdfUrl, label: 'PDF' });
 
   return {
